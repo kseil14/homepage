@@ -1,0 +1,888 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>내 일정 비서</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #09090b;
+      --surface: #111113;
+      --panel: #18181b;
+      --border: #27272a;
+      --text: #fafafa;
+      --muted: #71717a;
+      --subtle: #3f3f46;
+      --accent-1: #f97316;
+      --accent-2: #a855f7;
+      --accent-3: #06b6d4;
+      --high: #ef4444;
+      --medium: #f97316;
+      --low: #22c55e;
+      --glow: rgba(168, 85, 247, 0.2);
+    }
+
+    html { scroll-behavior: smooth; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Space Grotesk', sans-serif;
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+
+    /* HEADER */
+    .app-header {
+      position: sticky; top: 0; z-index: 50;
+      background: rgba(9,9,11,0.88);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border);
+      padding: 14px 20px;
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    }
+    .header-logo {
+      display: flex; align-items: center; gap: 10px;
+      text-decoration: none; color: var(--text);
+    }
+    .header-logo-icon {
+      width: 36px; height: 36px;
+      background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.1rem;
+    }
+    .header-logo-name { font-size: 1rem; font-weight: 700; letter-spacing: -0.02em; }
+    .header-logo-sub { font-size: 0.68rem; font-family: 'JetBrains Mono', monospace; color: var(--muted); }
+    .header-date { font-size: 0.8rem; font-family: 'JetBrains Mono', monospace; color: var(--muted); text-align: center; }
+    .header-date strong { display: block; font-size: 0.88rem; color: var(--text); font-weight: 600; }
+    .header-right { display: flex; align-items: center; gap: 8px; }
+    .icon-btn {
+      width: 36px; height: 36px;
+      border: 1px solid var(--border); border-radius: 10px;
+      background: var(--panel); color: var(--muted);
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+      font-size: 0.95rem; transition: all 0.2s; position: relative;
+    }
+    .icon-btn:hover { border-color: var(--subtle); color: var(--text); }
+    .icon-btn .badge {
+      position: absolute; top: -4px; right: -4px;
+      width: 16px; height: 16px;
+      background: var(--high); border-radius: 50%;
+      font-size: 0.62rem; font-weight: 700; color: white;
+      display: flex; align-items: center; justify-content: center;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* MAIN */
+    .app-main { max-width: 760px; margin: 0 auto; padding: 20px 14px 100px; }
+
+    /* NOTIFICATION BANNER */
+    .notif-banner {
+      background: rgba(168,85,247,0.07);
+      border: 1px solid rgba(168,85,247,0.2);
+      border-radius: 12px; padding: 12px 16px;
+      display: flex; align-items: center; gap: 12px;
+      margin-bottom: 16px; font-size: 0.83rem;
+    }
+    .notif-banner .nb-icon { font-size: 1.1rem; flex-shrink: 0; }
+    .notif-banner .nb-text { flex: 1; color: var(--muted); }
+    .notif-banner .nb-btn {
+      padding: 5px 12px;
+      border: 1px solid rgba(168,85,247,0.4); border-radius: 8px;
+      background: rgba(168,85,247,0.12); color: var(--accent-2);
+      font-size: 0.76rem; font-weight: 600; cursor: pointer;
+      font-family: 'Space Grotesk', sans-serif; white-space: nowrap;
+      transition: background 0.15s;
+    }
+    .notif-banner .nb-btn:hover { background: rgba(168,85,247,0.22); }
+
+    /* QUICK INPUT */
+    .quick-input-wrap { position: relative; margin-bottom: 20px; }
+    .quick-input {
+      width: 100%;
+      background: var(--panel); border: 1px solid var(--border);
+      border-radius: 16px; padding: 14px 96px 14px 18px;
+      font-size: 0.92rem; font-family: 'Space Grotesk', sans-serif;
+      color: var(--text); outline: none; resize: none; line-height: 1.4;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .quick-input:focus { border-color: var(--accent-2); box-shadow: 0 0 0 3px rgba(168,85,247,0.1); }
+    .quick-input::placeholder { color: var(--muted); font-size: 0.85rem; }
+    .quick-input-actions {
+      position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+      display: flex; gap: 6px; align-items: center;
+    }
+    .voice-btn {
+      width: 34px; height: 34px; border-radius: 9px;
+      border: 1px solid var(--border); background: var(--surface);
+      color: var(--muted); cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.9rem; transition: all 0.2s;
+    }
+    .voice-btn:hover { border-color: var(--accent-2); color: var(--accent-2); }
+    .voice-btn.recording {
+      background: rgba(239,68,68,0.12); border-color: #ef4444; color: #ef4444;
+      animation: rec-pulse 1s infinite;
+    }
+    @keyframes rec-pulse {
+      0%,100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.4); }
+      50% { box-shadow: 0 0 0 6px rgba(239,68,68,0); }
+    }
+    .add-btn {
+      width: 34px; height: 34px; border-radius: 9px; border: none;
+      background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
+      color: white; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.2rem; font-weight: 700; transition: opacity 0.2s, transform 0.2s;
+    }
+    .add-btn:hover { opacity: 0.85; transform: scale(1.06); }
+    .voice-hint {
+      display: none; margin-top: 6px; padding: 8px 14px;
+      background: rgba(168,85,247,0.07);
+      border: 1px solid rgba(168,85,247,0.18);
+      border-radius: 9px; font-size: 0.78rem;
+      color: var(--accent-2); font-family: 'JetBrains Mono', monospace;
+    }
+    .voice-hint.show { display: block; }
+
+    /* STATS */
+    .stats-row { display: grid; grid-template-columns: repeat(4,1fr); gap: 8px; margin-bottom: 16px; }
+    .stat-card {
+      background: var(--panel); border: 1px solid var(--border);
+      border-radius: 12px; padding: 12px 14px;
+      transition: border-color 0.2s;
+    }
+    .stat-card:hover { border-color: var(--subtle); }
+    .stat-num { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.04em; line-height: 1; }
+    .stat-label { font-size: 0.68rem; font-family: 'JetBrains Mono', monospace; color: var(--muted); margin-top: 2px; text-transform: uppercase; letter-spacing: 0.05em; }
+    .stat-card.s-today .stat-num { color: var(--accent-3); }
+    .stat-card.s-overdue .stat-num { color: var(--high); }
+    .stat-card.s-done .stat-num { color: var(--low); }
+
+    /* PROGRESS */
+    .progress-wrap {
+      background: var(--panel); border: 1px solid var(--border);
+      border-radius: 12px; padding: 12px 16px; margin-bottom: 16px;
+    }
+    .progress-top { display: flex; justify-content: space-between; font-size: 0.8rem; color: var(--muted); margin-bottom: 8px; }
+    .progress-top span:last-child { font-weight: 600; color: var(--text); }
+    .progress-bar { height: 5px; background: var(--border); border-radius: 99px; overflow: hidden; }
+    .progress-fill { height: 100%; background: linear-gradient(90deg, var(--accent-1), var(--accent-2)); border-radius: 99px; transition: width 0.5s ease; }
+
+    /* FILTER BAR */
+    .filter-bar { display: flex; align-items: center; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; }
+    .filter-btn {
+      padding: 5px 12px; border: 1px solid var(--border); border-radius: 99px;
+      background: transparent; color: var(--muted);
+      font-size: 0.76rem; font-family: 'Space Grotesk', sans-serif;
+      font-weight: 500; cursor: pointer; transition: all 0.2s; white-space: nowrap;
+    }
+    .filter-btn:hover { border-color: var(--subtle); color: var(--text); }
+    .filter-btn.active { background: var(--text); color: var(--bg); border-color: var(--text); }
+    .filter-spacer { flex: 1; }
+    .sort-select {
+      padding: 5px 10px; background: var(--panel);
+      border: 1px solid var(--border); border-radius: 8px;
+      color: var(--muted); font-size: 0.76rem;
+      font-family: 'JetBrains Mono', monospace; cursor: pointer; outline: none;
+    }
+
+    /* TASK LIST */
+    .task-list { display: flex; flex-direction: column; gap: 8px; }
+    .task-card {
+      background: var(--panel); border: 1px solid var(--border);
+      border-radius: 12px; padding: 14px 14px 14px 18px;
+      display: flex; align-items: flex-start; gap: 12px;
+      position: relative; overflow: hidden;
+      transition: border-color 0.2s, transform 0.2s;
+    }
+    .task-card::before {
+      content: ''; position: absolute;
+      left: 0; top: 0; bottom: 0; width: 3px;
+      border-radius: 12px 0 0 12px;
+    }
+    .task-card.high::before { background: var(--high); }
+    .task-card.medium::before { background: var(--medium); }
+    .task-card.low::before { background: var(--low); }
+    .task-card:hover { border-color: var(--subtle); transform: translateX(2px); }
+    .task-card.completed { opacity: 0.45; }
+    .task-card.completed .task-title { text-decoration: line-through; }
+    .task-card.overdue:not(.completed) { border-color: rgba(239,68,68,0.25); }
+
+    .task-check {
+      width: 20px; height: 20px; border: 2px solid var(--subtle);
+      border-radius: 6px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; margin-top: 2px; transition: all 0.2s; background: transparent;
+    }
+    .task-check:hover { border-color: var(--low); }
+    .task-check.checked { background: var(--low); border-color: var(--low); color: white; }
+    .task-check.checked::after { content: '✓'; font-size: 0.72rem; font-weight: 700; }
+
+    .task-body { flex: 1; min-width: 0; }
+    .task-title { font-size: 0.9rem; font-weight: 600; line-height: 1.3; margin-bottom: 3px; word-break: break-word; }
+    .task-desc { font-size: 0.78rem; color: var(--muted); line-height: 1.5; margin-bottom: 7px; word-break: break-word; }
+    .task-meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+    .task-due {
+      font-size: 0.7rem; font-family: 'JetBrains Mono', monospace;
+      padding: 2px 8px; border-radius: 99px;
+      border: 1px solid var(--border); color: var(--muted);
+    }
+    .task-due.today { border-color: rgba(6,182,212,0.35); color: var(--accent-3); background: rgba(6,182,212,0.07); }
+    .task-due.soon { border-color: rgba(249,115,22,0.35); color: var(--medium); background: rgba(249,115,22,0.07); }
+    .task-due.overdue { border-color: rgba(239,68,68,0.35); color: var(--high); background: rgba(239,68,68,0.07); }
+    .priority-badge {
+      font-size: 0.66rem; font-family: 'JetBrains Mono', monospace;
+      padding: 2px 8px; border-radius: 99px;
+    }
+    .priority-badge.high { background: rgba(239,68,68,0.12); color: var(--high); }
+    .priority-badge.medium { background: rgba(249,115,22,0.12); color: var(--medium); }
+    .priority-badge.low { background: rgba(34,197,94,0.12); color: var(--low); }
+    .task-tag {
+      font-size: 0.66rem; padding: 2px 8px; border-radius: 99px;
+      background: var(--surface); border: 1px solid var(--border);
+      color: var(--muted); font-family: 'JetBrains Mono', monospace;
+    }
+    .task-actions { display: flex; gap: 4px; flex-shrink: 0; opacity: 0; transition: opacity 0.2s; }
+    .task-card:hover .task-actions { opacity: 1; }
+    .task-action-btn {
+      width: 26px; height: 26px; border: 1px solid var(--border);
+      border-radius: 6px; background: var(--surface);
+      color: var(--muted); cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.75rem; transition: all 0.15s;
+    }
+    .task-action-btn:hover { border-color: var(--subtle); color: var(--text); }
+    .task-action-btn.del:hover { border-color: var(--high); color: var(--high); background: rgba(239,68,68,0.08); }
+
+    /* EMPTY STATE */
+    .empty-state { text-align: center; padding: 56px 24px; color: var(--muted); }
+    .empty-state-icon { font-size: 2.8rem; margin-bottom: 14px; }
+    .empty-state-title { font-size: 1rem; font-weight: 600; color: var(--text); margin-bottom: 6px; }
+    .empty-state-sub { font-size: 0.84rem; line-height: 1.6; }
+
+    /* MODAL */
+    .modal-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.72); backdrop-filter: blur(4px);
+      z-index: 100; display: flex; align-items: center; justify-content: center; padding: 16px;
+      opacity: 0; pointer-events: none; transition: opacity 0.2s;
+    }
+    .modal-overlay.open { opacity: 1; pointer-events: all; }
+    .modal {
+      background: var(--panel); border: 1px solid var(--border);
+      border-radius: 20px; width: 100%; max-width: 460px; padding: 26px;
+      transform: translateY(16px) scale(0.97);
+      transition: transform 0.2s; max-height: 90vh; overflow-y: auto;
+    }
+    .modal-overlay.open .modal { transform: none; }
+    .modal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 22px; }
+    .modal-title { font-size: 1.05rem; font-weight: 700; letter-spacing: -0.02em; }
+    .modal-close {
+      width: 30px; height: 30px; border: 1px solid var(--border);
+      border-radius: 8px; background: transparent; color: var(--muted);
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+      font-size: 0.85rem; transition: all 0.15s;
+    }
+    .modal-close:hover { border-color: var(--subtle); color: var(--text); }
+    .form-group { margin-bottom: 14px; }
+    .form-label {
+      display: block; font-size: 0.72rem;
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--muted); margin-bottom: 5px;
+      letter-spacing: 0.04em; text-transform: uppercase;
+    }
+    .form-input, .form-textarea {
+      width: 100%; background: var(--surface);
+      border: 1px solid var(--border); border-radius: 9px;
+      padding: 9px 12px; font-size: 0.88rem;
+      font-family: 'Space Grotesk', sans-serif;
+      color: var(--text); outline: none; transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .form-input:focus, .form-textarea:focus {
+      border-color: var(--accent-2); box-shadow: 0 0 0 3px rgba(168,85,247,0.1);
+    }
+    .form-textarea { resize: vertical; min-height: 72px; line-height: 1.5; }
+    .priority-picker { display: grid; grid-template-columns: repeat(3,1fr); gap: 7px; }
+    .p-opt {
+      padding: 9px 8px; border: 2px solid var(--border);
+      border-radius: 9px; cursor: pointer;
+      text-align: center; font-size: 0.8rem; font-weight: 600;
+      transition: all 0.15s;
+    }
+    .p-opt:hover { border-color: var(--subtle); }
+    .p-opt.high { color: var(--high); }
+    .p-opt.medium { color: var(--medium); }
+    .p-opt.low { color: var(--low); }
+    .p-opt.high.sel { border-color: var(--high); background: rgba(239,68,68,0.09); }
+    .p-opt.medium.sel { border-color: var(--medium); background: rgba(249,115,22,0.09); }
+    .p-opt.low.sel { border-color: var(--low); background: rgba(34,197,94,0.09); }
+    .date-row { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+    .modal-footer { display: flex; gap: 8px; margin-top: 22px; }
+    .btn-cancel {
+      flex: 1; padding: 10px; border: 1px solid var(--border);
+      border-radius: 9px; background: transparent; color: var(--muted);
+      font-size: 0.86rem; font-weight: 600; cursor: pointer;
+      font-family: 'Space Grotesk', sans-serif; transition: all 0.15s;
+    }
+    .btn-cancel:hover { border-color: var(--subtle); color: var(--text); }
+    .btn-save {
+      flex: 2; padding: 10px; border: none; border-radius: 9px;
+      background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
+      color: white; font-size: 0.86rem; font-weight: 700;
+      cursor: pointer; font-family: 'Space Grotesk', sans-serif;
+      transition: opacity 0.15s, transform 0.15s;
+    }
+    .btn-save:hover { opacity: 0.88; transform: translateY(-1px); }
+
+    /* TOAST */
+    .toast-container {
+      position: fixed; bottom: 88px; right: 14px;
+      z-index: 200; display: flex; flex-direction: column; gap: 7px;
+      pointer-events: none;
+    }
+    .toast {
+      background: var(--panel); border: 1px solid var(--border);
+      border-radius: 11px; padding: 11px 14px;
+      font-size: 0.83rem; max-width: 280px;
+      box-shadow: 0 8px 28px rgba(0,0,0,0.4);
+      animation: t-in 0.25s ease; pointer-events: all;
+    }
+    @keyframes t-in { from { opacity:0; transform: translateX(16px); } to { opacity:1; transform: none; } }
+    .toast.success { border-color: rgba(34,197,94,0.35); }
+    .toast.error { border-color: rgba(239,68,68,0.35); }
+    .toast.info { border-color: rgba(6,182,212,0.35); }
+
+    /* FAB */
+    .fab {
+      position: fixed; bottom: 22px; right: 22px;
+      width: 54px; height: 54px; border-radius: 50%; border: none;
+      background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
+      color: white; font-size: 1.5rem; cursor: pointer;
+      box-shadow: 0 4px 22px rgba(168,85,247,0.38);
+      transition: transform 0.2s, box-shadow 0.2s;
+      z-index: 40; display: flex; align-items: center; justify-content: center;
+    }
+    .fab:hover { transform: scale(1.08); box-shadow: 0 6px 30px rgba(168,85,247,0.5); }
+
+    /* BG ORBS */
+    .bg-orb { position: fixed; border-radius: 50%; pointer-events: none; z-index: 0; }
+    .bg-orb-1 { width: 500px; height: 500px; top: -150px; right: -150px; background: radial-gradient(circle, rgba(168,85,247,0.05) 0%, transparent 70%); }
+    .bg-orb-2 { width: 400px; height: 400px; bottom: 20%; left: -100px; background: radial-gradient(circle, rgba(249,115,22,0.04) 0%, transparent 70%); }
+
+    /* SHORTCUT HINT */
+    .shortcut-hint {
+      font-size: 0.7rem; font-family: 'JetBrains Mono', monospace;
+      color: var(--subtle); margin-top: 5px; text-align: right;
+    }
+
+    @media (max-width: 580px) {
+      .stats-row { grid-template-columns: repeat(2,1fr); }
+      .header-date { display: none; }
+      .task-actions { opacity: 1; }
+    }
+  </style>
+</head>
+<body>
+  <div class="bg-orb bg-orb-1"></div>
+  <div class="bg-orb bg-orb-2"></div>
+
+  <header class="app-header">
+    <a href="index.html" class="header-logo">
+      <div class="header-logo-icon">📋</div>
+      <div>
+        <div class="header-logo-name">내 일정 비서</div>
+        <div class="header-logo-sub">Personal Task Manager</div>
+      </div>
+    </a>
+    <div class="header-date" id="headerDate"></div>
+    <div class="header-right">
+      <button class="icon-btn" id="notifBtn" title="알림 상태" onclick="checkNow()">
+        🔔
+        <span class="badge" id="overdueCount" style="display:none"></span>
+      </button>
+    </div>
+  </header>
+
+  <main class="app-main">
+    <div class="notif-banner" id="notifBanner" style="display:none">
+      <div class="nb-icon">🔔</div>
+      <div class="nb-text">알림을 허용하면 마감 시간 전에 자동으로 알려드려요</div>
+      <button class="nb-btn" onclick="reqNotif()">허용하기</button>
+    </div>
+
+    <div class="quick-input-wrap">
+      <textarea class="quick-input" id="quickInput"
+        placeholder="할 일을 입력하세요... 예: 내일 오후 3시 팀 회의 긴급 / 오늘 저녁 7시 보고서 제출"
+        rows="1"></textarea>
+      <div class="quick-input-actions">
+        <button class="voice-btn" id="voiceBtn" onclick="toggleVoice()" title="음성 입력 (한국어)">🎙️</button>
+        <button class="add-btn" onclick="quickAdd()" title="추가 (Enter)">+</button>
+      </div>
+    </div>
+    <div class="voice-hint" id="voiceHint"></div>
+    <div class="shortcut-hint">Enter로 빠른 추가 &nbsp;·&nbsp; Ctrl+K 입력창 포커스 &nbsp;·&nbsp; Ctrl+Enter 모달 저장</div>
+
+    <div class="stats-row" style="margin-top:14px">
+      <div class="stat-card"><div class="stat-num" id="statTotal">0</div><div class="stat-label">진행 중</div></div>
+      <div class="stat-card s-today"><div class="stat-num" id="statToday">0</div><div class="stat-label">오늘 마감</div></div>
+      <div class="stat-card s-overdue"><div class="stat-num" id="statOverdue">0</div><div class="stat-label">기한 초과</div></div>
+      <div class="stat-card s-done"><div class="stat-num" id="statDone">0</div><div class="stat-label">완료</div></div>
+    </div>
+
+    <div class="progress-wrap">
+      <div class="progress-top"><span>전체 완료율</span><span id="progressPct">0%</span></div>
+      <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+    </div>
+
+    <div class="filter-bar">
+      <button class="filter-btn active" onclick="setFilter('all',this)">전체</button>
+      <button class="filter-btn" onclick="setFilter('today',this)">오늘</button>
+      <button class="filter-btn" onclick="setFilter('upcoming',this)">예정</button>
+      <button class="filter-btn" onclick="setFilter('high',this)">⚡ 긴급</button>
+      <button class="filter-btn" onclick="setFilter('overdue',this)">⏰ 초과</button>
+      <button class="filter-btn" onclick="setFilter('completed',this)">✓ 완료</button>
+      <div class="filter-spacer"></div>
+      <select class="sort-select" onchange="setSort(this.value)">
+        <option value="priority">우선순위</option>
+        <option value="dueDate">마감일</option>
+        <option value="created">최신순</option>
+      </select>
+    </div>
+
+    <div class="task-list" id="taskList"></div>
+  </main>
+
+  <button class="fab" onclick="openModal()" title="새 할 일 추가 (N)">+</button>
+  <div class="toast-container" id="toastContainer"></div>
+
+  <div class="modal-overlay" id="modalOverlay" onclick="closeModalBg(event)">
+    <div class="modal">
+      <div class="modal-header">
+        <div class="modal-title" id="modalTitle">새 할 일</div>
+        <button class="modal-close" onclick="closeModal()">✕</button>
+      </div>
+      <div class="form-group">
+        <label class="form-label">제목 *</label>
+        <input type="text" class="form-input" id="fTitle" placeholder="할 일 제목" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">설명</label>
+        <textarea class="form-textarea" id="fDesc" placeholder="세부 내용 (선택)"></textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-label">우선순위</label>
+        <div class="priority-picker">
+          <div class="p-opt high" data-p="high" onclick="selP('high')">🔴 높음</div>
+          <div class="p-opt medium sel" data-p="medium" onclick="selP('medium')">🟡 보통</div>
+          <div class="p-opt low" data-p="low" onclick="selP('low')">🟢 낮음</div>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">마감 날짜 / 시간</label>
+        <div class="date-row">
+          <input type="date" class="form-input" id="fDate" />
+          <input type="time" class="form-input" id="fTime" />
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">태그 (쉼표 구분)</label>
+        <input type="text" class="form-input" id="fTags" placeholder="업무, 개인, 공부..." />
+      </div>
+      <div class="modal-footer">
+        <button class="btn-cancel" onclick="closeModal()">취소</button>
+        <button class="btn-save" onclick="saveTask()">저장하기</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+  /* ── STATE ─────────────────────────────────────────────────────── */
+  const S = { tasks: [], filter: 'all', sort: 'priority', editId: null, selPriority: 'medium' };
+
+  /* ── INIT ──────────────────────────────────────────────────────── */
+  function init() {
+    loadTasks();
+    updateClock();
+    checkNotifPerm();
+    render();
+    setInterval(checkNotifs, 30000);
+    setInterval(updateClock, 60000);
+    checkNotifs();
+    const qi = document.getElementById('quickInput');
+    qi.addEventListener('input', () => { qi.style.height = 'auto'; qi.style.height = qi.scrollHeight + 'px'; });
+    qi.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); quickAdd(); } });
+  }
+
+  /* ── CLOCK ─────────────────────────────────────────────────────── */
+  function updateClock() {
+    const n = new Date();
+    const days = ['일','월','화','수','목','금','토'];
+    document.getElementById('headerDate').innerHTML =
+      `<strong>${n.getFullYear()}.${p2(n.getMonth()+1)}.${p2(n.getDate())}</strong>${days[n.getDay()]}요일`;
+  }
+  const p2 = n => String(n).padStart(2,'0');
+
+  /* ── DATE HELPERS ──────────────────────────────────────────────── */
+  function isToday(d) {
+    const n = new Date();
+    return d.getFullYear()===n.getFullYear() && d.getMonth()===n.getMonth() && d.getDate()===n.getDate();
+  }
+  function isTomorrow(d) {
+    const t = new Date(); t.setDate(t.getDate()+1);
+    return d.getFullYear()===t.getFullYear() && d.getMonth()===t.getMonth() && d.getDate()===t.getDate();
+  }
+  function formatDue(iso) {
+    if (!iso) return null;
+    const d = new Date(iso), now = new Date();
+    const diffMs = d - now, diffMin = Math.round(diffMs/60000);
+    const time = `${p2(d.getHours())}:${p2(d.getMinutes())}`;
+    if (diffMs < 0) {
+      const absDays = Math.abs(Math.floor(diffMs/86400000));
+      return { label: absDays===0 ? `오늘 ${time} 초과` : `${absDays}일 전 초과`, cls: 'overdue' };
+    }
+    if (isToday(d)) return { label: diffMin < 60 ? `오늘 ${time} (${diffMin}분 후)` : `오늘 ${time}`, cls: 'today' };
+    if (isTomorrow(d)) return { label: `내일 ${time}`, cls: 'soon' };
+    const diffDays = Math.floor(diffMs/86400000);
+    if (diffDays < 7) { const dn=['일','월','화','수','목','금','토']; return { label: `${dn[d.getDay()]}요일 ${time}`, cls: '' }; }
+    return { label: `${d.getMonth()+1}/${d.getDate()} ${time}`, cls: '' };
+  }
+
+  /* ── NATURAL LANGUAGE PARSER ───────────────────────────────────── */
+  function parseNL(text) {
+    let t = text.trim(), priority = 'medium', date = null;
+    if (/긴급|급함|urgent|중요한|빠른|critical/.test(t)) priority = 'high';
+    else if (/낮음|나중에|여유/.test(t)) priority = 'low';
+    t = t.replace(/긴급|급함|중요한|빠른|나중에|여유롭게/g,'').trim();
+
+    const now = new Date(), base = new Date(now);
+    let hasDate = false, hasTime = false, m;
+
+    // N분/시간/일 후
+    if ((m = t.match(/(\d+)\s*분\s*후/))) { base.setTime(now.getTime()+parseInt(m[1])*60000); hasDate=hasTime=true; t=t.replace(m[0],'').trim(); }
+    else if ((m = t.match(/(\d+)\s*시간\s*후/))) { base.setTime(now.getTime()+parseInt(m[1])*3600000); hasDate=hasTime=true; t=t.replace(m[0],'').trim(); }
+    else if ((m = t.match(/(\d+)\s*일\s*후/))) { base.setDate(now.getDate()+parseInt(m[1])); hasDate=true; t=t.replace(m[0],'').trim(); }
+
+    // 오늘/내일/모레
+    if (!hasDate) {
+      if (/오늘|today/.test(t)) { hasDate=true; t=t.replace(/오늘|today/g,'').trim(); }
+      else if (/내일|tomorrow/.test(t)) { base.setDate(now.getDate()+1); hasDate=true; t=t.replace(/내일|tomorrow/g,'').trim(); }
+      else if (/모레/.test(t)) { base.setDate(now.getDate()+2); hasDate=true; t=t.replace(/모레/g,'').trim(); }
+    }
+
+    // 다음주 요일
+    if (!hasDate) {
+      const nw = {'다음주 월':1,'다음주 화':2,'다음주 수':3,'다음주 목':4,'다음주 금':5,'다음주 토':6,'다음주 일':0};
+      for (const [k,v] of Object.entries(nw)) {
+        if (t.includes(k)) {
+          const d=new Date(now); d.setDate(now.getDate()+7);
+          while(d.getDay()!==v) d.setDate(d.getDate()+1);
+          base.setFullYear(d.getFullYear(),d.getMonth(),d.getDate()); hasDate=true;
+          t=t.replace(k,'').trim(); break;
+        }
+      }
+    }
+
+    // 이번주 요일
+    if (!hasDate) {
+      const dmap = {'월요일':1,'화요일':2,'수요일':3,'목요일':4,'금요일':5,'토요일':6,'일요일':0};
+      for (const [k,v] of Object.entries(dmap)) {
+        if (t.includes(k)) {
+          const d=new Date(now), diff=(v-now.getDay()+7)%7||7;
+          d.setDate(now.getDate()+diff);
+          base.setFullYear(d.getFullYear(),d.getMonth(),d.getDate()); hasDate=true;
+          t=t.replace(k,'').trim(); break;
+        }
+      }
+    }
+
+    // N월 M일
+    if (!hasDate && (m = t.match(/(\d{1,2})월\s*(\d{1,2})일/))) {
+      let yr=now.getFullYear();
+      const cand=new Date(yr,parseInt(m[1])-1,parseInt(m[2]));
+      if (cand<now) yr++;
+      base.setFullYear(yr,parseInt(m[1])-1,parseInt(m[2])); hasDate=true;
+      t=t.replace(m[0],'').trim();
+    }
+
+    // 오전/오후 N시 M분
+    if ((m = t.match(/(오전|오후|아침|저녁|밤)\s*(\d{1,2})시(?:\s*(\d{1,2})분)?/))) {
+      let h=parseInt(m[2]), min=m[3]?parseInt(m[3]):0;
+      if ((m[1]==='오후'||m[1]==='저녁'||m[1]==='밤') && h<12) h+=12;
+      if (m[1]==='오전' && h===12) h=0;
+      base.setHours(h,min,0,0); hasTime=true;
+      t=t.replace(m[0],'').trim();
+    }
+
+    // 점심
+    if (!hasTime && t.includes('점심')) { base.setHours(12,0,0,0); hasTime=true; t=t.replace('점심','').trim(); }
+
+    // N시 M분 (without 오전/오후)
+    if (!hasTime && (m = t.match(/(\d{1,2})시(?:\s*(\d{1,2})분)?/))) {
+      let h=parseInt(m[1]); const min=m[2]?parseInt(m[2]):0;
+      if (h>0 && h<7) h+=12;
+      base.setHours(h,min,0,0); hasTime=true;
+      t=t.replace(m[0],'').trim();
+    }
+
+    if (hasDate||hasTime) { if (!hasTime) base.setHours(9,0,0,0); date=base.toISOString(); }
+
+    t = t.replace(/\s*(에|까지|에서|까지|로|을|를)\s*$/,'').replace(/\s{2,}/g,' ').trim();
+    return { title: t||text.trim(), date, priority };
+  }
+
+  /* ── QUICK ADD ─────────────────────────────────────────────────── */
+  function quickAdd() {
+    const qi = document.getElementById('quickInput');
+    const raw = qi.value.trim();
+    if (!raw) return;
+    const parsed = parseNL(raw);
+    if (!parsed.title) { toast('제목을 입력해주세요', 'error'); return; }
+    S.tasks.unshift(mkTask(parsed.title,'',parsed.priority,parsed.date,[]));
+    save(); render();
+    qi.value=''; qi.style.height='auto';
+    const hint = document.getElementById('voiceHint');
+    if (parsed.date) {
+      hint.textContent = `✓ "${parsed.title}" — ${new Date(parsed.date).toLocaleString('ko-KR')}`;
+      hint.className='voice-hint show';
+      setTimeout(()=>hint.className='voice-hint',3000);
+    } else toast(`"${parsed.title}" 추가됨`,'success');
+  }
+
+  /* ── VOICE ─────────────────────────────────────────────────────── */
+  let recog=null, recOn=false;
+  function toggleVoice() {
+    if (!('webkitSpeechRecognition' in window||'SpeechRecognition' in window)) {
+      toast('이 브라우저는 음성 인식을 지원하지 않습니다 (Chrome 권장)','error'); return;
+    }
+    recOn ? stopVoice() : startVoice();
+  }
+  function startVoice() {
+    const SR = window.SpeechRecognition||window.webkitSpeechRecognition;
+    recog = new SR(); recog.lang='ko-KR'; recog.interimResults=true; recog.continuous=false;
+    const hint=document.getElementById('voiceHint'), btn=document.getElementById('voiceBtn'), qi=document.getElementById('quickInput');
+    recog.onstart = () => { recOn=true; btn.classList.add('recording'); btn.textContent='⏹'; hint.textContent='🎙️ 말씀하세요...'; hint.className='voice-hint show'; };
+    recog.onresult = e => {
+      const tr = Array.from(e.results).map(r=>r[0].transcript).join('');
+      qi.value=tr; qi.style.height='auto'; qi.style.height=qi.scrollHeight+'px';
+      if (e.results[e.results.length-1].isFinal) {
+        const p=parseNL(tr); const parts=[];
+        if (p.date) parts.push(`마감: ${new Date(p.date).toLocaleString('ko-KR')}`);
+        if (p.priority!=='medium') parts.push(`우선순위: ${{high:'높음',low:'낮음'}[p.priority]}`);
+        hint.textContent = parts.length ? `📝 ${parts.join(' / ')}` : `📝 인식됨: "${tr}"`;
+      }
+    };
+    recog.onerror = e => { toast('음성 오류: '+e.error,'error'); stopVoice(); };
+    recog.onend = () => stopVoice();
+    recog.start();
+  }
+  function stopVoice() {
+    recOn=false;
+    const btn=document.getElementById('voiceBtn');
+    btn.classList.remove('recording'); btn.textContent='🎙️';
+    if (recog) { try{recog.stop();}catch(e){} recog=null; }
+  }
+
+  /* ── TASK CRUD ─────────────────────────────────────────────────── */
+  function mkTask(title,desc,priority,dueDate,tags) {
+    return { id: Date.now().toString(36)+Math.random().toString(36).slice(2,5),
+      title, desc:desc||'', priority:priority||'medium', dueDate:dueDate||null,
+      tags:tags||[], completed:false, notified:false, notifiedDue:false,
+      createdAt:new Date().toISOString() };
+  }
+  function delTask(id) { S.tasks=S.tasks.filter(t=>t.id!==id); save(); render(); toast('삭제됐습니다','info'); }
+  function togComplete(id) {
+    const t=S.tasks.find(t=>t.id===id); if(t){ t.completed=!t.completed; save(); render(); }
+  }
+  function editTask(id) {
+    const t=S.tasks.find(t=>t.id===id); if(!t) return;
+    S.editId=id;
+    document.getElementById('modalTitle').textContent='할 일 수정';
+    document.getElementById('fTitle').value=t.title;
+    document.getElementById('fDesc').value=t.desc;
+    selP(t.priority);
+    if (t.dueDate) {
+      const d=new Date(t.dueDate);
+      document.getElementById('fDate').value=d.toISOString().split('T')[0];
+      document.getElementById('fTime').value=`${p2(d.getHours())}:${p2(d.getMinutes())}`;
+    } else { document.getElementById('fDate').value=''; document.getElementById('fTime').value=''; }
+    document.getElementById('fTags').value=t.tags.join(', ');
+    openModal();
+  }
+
+  /* ── MODAL ─────────────────────────────────────────────────────── */
+  function openModal() {
+    if (!S.editId) {
+      document.getElementById('modalTitle').textContent='새 할 일';
+      document.getElementById('fTitle').value='';
+      document.getElementById('fDesc').value='';
+      document.getElementById('fDate').value='';
+      document.getElementById('fTime').value='';
+      document.getElementById('fTags').value='';
+      selP('medium');
+    }
+    document.getElementById('modalOverlay').classList.add('open');
+    setTimeout(()=>document.getElementById('fTitle').focus(),80);
+  }
+  function closeModal() { document.getElementById('modalOverlay').classList.remove('open'); S.editId=null; }
+  function closeModalBg(e) { if(e.target===document.getElementById('modalOverlay')) closeModal(); }
+  function selP(p) {
+    S.selPriority=p;
+    document.querySelectorAll('.p-opt').forEach(el=>el.classList.toggle('sel',el.dataset.p===p));
+  }
+  function saveTask() {
+    const title=document.getElementById('fTitle').value.trim();
+    if (!title) { toast('제목을 입력해주세요','error'); document.getElementById('fTitle').focus(); return; }
+    const desc=document.getElementById('fDesc').value.trim();
+    const ds=document.getElementById('fDate').value, ts=document.getElementById('fTime').value;
+    const tags=document.getElementById('fTags').value.split(',').map(x=>x.trim()).filter(Boolean);
+    let due=null;
+    if (ds) { const d=new Date(ds); if(ts){const[h,m]=ts.split(':');d.setHours(+h,+m,0,0);}else d.setHours(9,0,0,0); due=d.toISOString(); }
+    if (S.editId) {
+      const t=S.tasks.find(t=>t.id===S.editId);
+      if(t) { Object.assign(t,{title,desc,priority:S.selPriority,dueDate:due,tags}); t.notified=false; t.notifiedDue=false; }
+    } else S.tasks.unshift(mkTask(title,desc,S.selPriority,due,tags));
+    save(); render(); closeModal();
+    toast(S.editId?'수정됐습니다':'추가됐습니다','success');
+  }
+
+  /* ── FILTER & SORT ─────────────────────────────────────────────── */
+  function setFilter(f, btn) {
+    S.filter=f;
+    document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active'); render();
+  }
+  function setSort(s) { S.sort=s; render(); }
+  function getFiltered() {
+    const now=new Date(); let tasks=[...S.tasks];
+    const pOrd={high:0,medium:1,low:2};
+    switch(S.filter) {
+      case 'today': tasks=tasks.filter(t=>t.dueDate&&isToday(new Date(t.dueDate))); break;
+      case 'upcoming': tasks=tasks.filter(t=>t.dueDate&&new Date(t.dueDate)>now&&!isToday(new Date(t.dueDate))&&!t.completed); break;
+      case 'high': tasks=tasks.filter(t=>t.priority==='high'&&!t.completed); break;
+      case 'overdue': tasks=tasks.filter(t=>t.dueDate&&new Date(t.dueDate)<now&&!t.completed); break;
+      case 'completed': tasks=tasks.filter(t=>t.completed); break;
+    }
+    tasks.sort((a,b)=>{
+      if (S.sort==='priority') {
+        const pd=pOrd[a.priority]-pOrd[b.priority]; if(pd!==0) return pd;
+        if(a.dueDate&&b.dueDate) return new Date(a.dueDate)-new Date(b.dueDate);
+        return a.dueDate?-1:b.dueDate?1:0;
+      }
+      if (S.sort==='dueDate') {
+        if(a.dueDate&&b.dueDate) return new Date(a.dueDate)-new Date(b.dueDate);
+        return a.dueDate?-1:b.dueDate?1:0;
+      }
+      return new Date(b.createdAt)-new Date(a.createdAt);
+    });
+    return tasks;
+  }
+
+  /* ── RENDER ────────────────────────────────────────────────────── */
+  function render() { renderStats(); renderList(); }
+  function renderStats() {
+    const now=new Date();
+    const active=S.tasks.filter(t=>!t.completed).length;
+    const today=S.tasks.filter(t=>t.dueDate&&isToday(new Date(t.dueDate))&&!t.completed).length;
+    const ov=S.tasks.filter(t=>t.dueDate&&new Date(t.dueDate)<now&&!t.completed).length;
+    const done=S.tasks.filter(t=>t.completed).length;
+    const pct=S.tasks.length>0?Math.round((done/S.tasks.length)*100):0;
+    document.getElementById('statTotal').textContent=active;
+    document.getElementById('statToday').textContent=today;
+    document.getElementById('statOverdue').textContent=ov;
+    document.getElementById('statDone').textContent=done;
+    document.getElementById('progressPct').textContent=pct+'%';
+    document.getElementById('progressFill').style.width=pct+'%';
+    const ob=document.getElementById('overdueCount');
+    if(ov>0){ob.textContent=ov;ob.style.display='flex';}else ob.style.display='none';
+  }
+  function renderList() {
+    const el=document.getElementById('taskList'), tasks=getFiltered(), now=new Date();
+    if (!tasks.length) {
+      const msgs={all:['할 일이 없습니다','상단 입력창이나 + 버튼으로 추가해보세요'],today:['오늘 마감인 항목 없음','오늘은 여유로운 하루!'],upcoming:['예정된 항목 없음',''],high:['긴급 항목 없음',''],overdue:['기한 초과 없음','잘 지키고 있어요 👍'],completed:['완료 항목 없음','완료한 항목이 여기 표시됩니다']};
+      const [t,s]=msgs[S.filter]||['',''];
+      el.innerHTML=`<div class="empty-state"><div class="empty-state-icon">${S.filter==='completed'?'🎉':'✅'}</div><div class="empty-state-title">${t}</div><div class="empty-state-sub">${s}</div></div>`; return;
+    }
+    el.innerHTML = tasks.map(task => {
+      const isOv=task.dueDate&&new Date(task.dueDate)<now&&!task.completed;
+      const due=task.dueDate?formatDue(task.dueDate):null;
+      const pLabel={high:'긴급',medium:'보통',low:'낮음'}[task.priority];
+      return `<div class="task-card ${task.priority}${task.completed?' completed':''}${isOv?' overdue':''}">
+        <div class="task-check${task.completed?' checked':''}" onclick="togComplete('${task.id}')"></div>
+        <div class="task-body">
+          <div class="task-title">${esc(task.title)}</div>
+          ${task.desc?`<div class="task-desc">${esc(task.desc)}</div>`:''}
+          <div class="task-meta">
+            ${due?`<span class="task-due ${due.cls}">${due.label}</span>`:''}
+            <span class="priority-badge ${task.priority}">${pLabel}</span>
+            ${task.tags.map(tg=>`<span class="task-tag">${esc(tg)}</span>`).join('')}
+          </div>
+        </div>
+        <div class="task-actions">
+          <button class="task-action-btn" onclick="editTask('${task.id}')" title="수정">✏️</button>
+          <button class="task-action-btn del" onclick="delTask('${task.id}')" title="삭제">🗑️</button>
+        </div>
+      </div>`;
+    }).join('');
+  }
+  const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+  /* ── NOTIFICATIONS ─────────────────────────────────────────────── */
+  function checkNotifPerm() {
+    if (!('Notification' in window)) return;
+    if (Notification.permission==='default') document.getElementById('notifBanner').style.display='flex';
+  }
+  function reqNotif() {
+    Notification.requestPermission().then(p=>{
+      document.getElementById('notifBanner').style.display='none';
+      if(p==='granted') toast('알림이 허용됐습니다! 🔔','success');
+    });
+  }
+  function checkNotifs() {
+    if (Notification.permission!=='granted') return;
+    const now=new Date(); let changed=false;
+    S.tasks.forEach(task=>{
+      if(task.completed||!task.dueDate) return;
+      const due=new Date(task.dueDate), diff=(due-now)/60000;
+      if(diff<=10&&diff>0&&!task.notified) {
+        task.notified=true; changed=true;
+        new Notification(`⏰ 마감 임박: ${task.title}`,{body:`${Math.round(diff)}분 후 마감!`,icon:'📋'});
+      }
+      if(diff<=0&&diff>-2&&!task.notifiedDue) {
+        task.notifiedDue=true; changed=true;
+        new Notification(`🚨 마감: ${task.title}`,{body:'마감 시간이 됐습니다!',icon:'📋'});
+      }
+    });
+    if(changed){save();renderStats();}
+  }
+  function checkNow() { checkNotifs(); toast('알림 상태를 확인했습니다','info'); }
+
+  /* ── STORAGE ───────────────────────────────────────────────────── */
+  function save() { try{localStorage.setItem('tm_v1',JSON.stringify(S.tasks));}catch(e){} }
+  function loadTasks() { try{const r=localStorage.getItem('tm_v1');if(r)S.tasks=JSON.parse(r);}catch(e){S.tasks=[];} }
+
+  /* ── TOAST ─────────────────────────────────────────────────────── */
+  function toast(msg, type='info') {
+    const c=document.getElementById('toastContainer');
+    const el=document.createElement('div'); el.className=`toast ${type}`; el.textContent=msg;
+    c.appendChild(el);
+    setTimeout(()=>{ el.style.opacity='0'; el.style.transition='opacity 0.3s'; setTimeout(()=>el.remove(),300); },2500);
+  }
+
+  /* ── KEYBOARD ──────────────────────────────────────────────────── */
+  document.addEventListener('keydown', e=>{
+    if ((e.metaKey||e.ctrlKey)&&e.key==='k') { e.preventDefault(); document.getElementById('quickInput').focus(); }
+    if (e.key==='Escape') closeModal();
+    if ((e.metaKey||e.ctrlKey)&&e.key==='Enter'&&document.getElementById('modalOverlay').classList.contains('open')) saveTask();
+    if (e.key==='n'&&!document.getElementById('modalOverlay').classList.contains('open')&&document.activeElement.tagName!=='INPUT'&&document.activeElement.tagName!=='TEXTAREA') openModal();
+  });
+
+  init();
+  </script>
+</body>
+</html>
