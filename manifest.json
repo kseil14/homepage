@@ -1,0 +1,20 @@
+{
+  "name": "내 일정 비서",
+  "short_name": "일정 비서",
+  "description": "음성 입력과 자연어 날짜 인식을 갖춘 개인 비서급 할 일 관리 앱",
+  "start_url": "./tasks.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f0f0f5",
+  "theme_color": "#7c3aed",
+  "lang": "ko",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
