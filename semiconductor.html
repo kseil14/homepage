@@ -1,0 +1,865 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>반도체 투자 지표 분석</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+:root{
+  --bg:#0b0e14;--bg2:#141820;--bg3:#1c2232;--border:#252f42;
+  --t:#e2e8f0;--t2:#7b8fa8;--t3:#3d4f68;
+  --g:#22c55e;--g2:rgba(34,197,94,.15);
+  --y:#f59e0b;--y2:rgba(245,158,11,.15);
+  --r:#ef4444;--r2:rgba(239,68,68,.15);
+  --b:#3b82f6;--b2:rgba(59,130,246,.18);
+  --p:#a855f7;--c:#06b6d4;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--t);font-size:13px;line-height:1.5}
+
+/* ── LOADING ── */
+#loadOverlay{position:fixed;inset:0;background:rgba(11,14,20,.96);z-index:9999;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:16px}
+.spin{width:44px;height:44px;border:3px solid var(--border);border-top-color:var(--b);border-radius:50%;animation:sp .7s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+#loadTxt{font-size:13px;color:var(--t2)}
+#loadSub{font-size:11px;color:var(--t3);margin-top:-8px}
+
+/* ── HEADER ── */
+.hdr{background:var(--bg2);border-bottom:1px solid var(--border);padding:9px 18px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;position:sticky;top:0;z-index:100}
+.hdr-title{font-size:14px;font-weight:700;white-space:nowrap;display:flex;align-items:center;gap:7px}
+.hdr-title span{font-size:9px;background:var(--b);color:#fff;padding:2px 6px;border-radius:3px;font-weight:600}
+.hdr-sep{flex:1}
+.badge{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:12px;font-size:10px;font-weight:600;white-space:nowrap}
+.badge-live{background:var(--g2);color:var(--g);border:1px solid rgba(34,197,94,.3)}
+.badge-cache{background:var(--y2);color:var(--y);border:1px solid rgba(245,158,11,.3)}
+.badge-err{background:var(--r2);color:var(--r);border:1px solid rgba(239,68,68,.3)}
+.badge-sig{font-size:11px;font-weight:700;padding:4px 12px;border-radius:14px}
+.sig-bull{background:var(--g2);color:var(--g);border:1px solid rgba(34,197,94,.35)}
+.sig-neut{background:var(--y2);color:var(--y);border:1px solid rgba(245,158,11,.35)}
+.sig-bear{background:var(--r2);color:var(--r);border:1px solid rgba(239,68,68,.35)}
+.trng{display:flex;gap:3px}
+.trng button{background:var(--bg3);border:1px solid var(--border);color:var(--t2);padding:3px 9px;border-radius:4px;cursor:pointer;font-size:11px;transition:.15s}
+.trng button.act{background:var(--b);border-color:var(--b);color:#fff}
+.trng button:hover:not(.act){color:var(--t);border-color:var(--t2)}
+.btn-refresh{background:none;border:1px solid var(--border);color:var(--t2);padding:4px 10px;border-radius:5px;cursor:pointer;font-size:11px;display:flex;align-items:center;gap:5px;transition:.15s}
+.btn-refresh:hover{color:var(--t);border-color:var(--t2)}
+.btn-refresh svg{transition:.3s}
+.btn-refresh.loading svg{animation:sp .7s linear infinite}
+
+/* ── MAIN ── */
+main{padding:14px 18px;max-width:1680px;margin:0 auto;transition:opacity .4s}
+.slbl{font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.07em;margin:0 0 10px;display:flex;align-items:center;gap:8px}
+.slbl::after{content:'';flex:1;height:1px;background:var(--border)}
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:14px}
+
+/* ── DASH GRID ── */
+.dash{display:grid;grid-template-columns:220px 1fr 270px;gap:12px;margin-bottom:16px}
+
+/* GAUGE */
+.gauge-card{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:18px 14px}
+.gauge-wrap{position:relative;width:160px;height:95px}
+.gauge-wrap svg{width:100%;height:100%}
+.gauge-num{position:absolute;bottom:0;left:50%;transform:translateX(-50%);text-align:center;line-height:1}
+.gauge-num .n{font-size:40px;font-weight:900}
+.gauge-num .d{font-size:10px;color:var(--t3)}
+.gauge-meta{text-align:center;font-size:11px;display:flex;flex-direction:column;gap:2px}
+.gauge-chg{font-weight:700}
+.gauge-chg.up{color:var(--g)} .gauge-chg.dn{color:var(--r)}
+.gauge-hint{font-size:10px;color:var(--t3)}
+.score-zones{display:flex;gap:10px;font-size:9px;color:var(--t2)}
+.zone{display:flex;align-items:center;gap:3px}
+.zdot{width:6px;height:6px;border-radius:50%}
+
+/* CAT BARS */
+.cbars{display:flex;flex-direction:column;gap:6px}
+.crow{display:grid;grid-template-columns:125px 1fr 32px 26px;align-items:center;gap:7px}
+.cname{font-size:10px;color:var(--t2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.btrack{height:5px;background:var(--bg3);border-radius:3px;overflow:hidden}
+.bfill{height:100%;border-radius:3px;transition:width .6s ease}
+.cscore{font-size:11px;font-weight:700;text-align:right}
+.cwt{font-size:9px;color:var(--t3);text-align:right}
+
+/* ── INDICATOR CARDS ── */
+.igrid{display:grid;grid-template-columns:repeat(3,1fr);gap:11px;margin-bottom:16px}
+.icard{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:13px;position:relative;overflow:hidden}
+.icard::before{content:'';position:absolute;top:0;left:0;right:0;height:2.5px}
+.icard.bull::before{background:var(--g)} .icard.neut::before{background:var(--y)} .icard.bear::before{background:var(--r)}
+.ihd{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:7px}
+.ititle{font-size:12px;font-weight:600}
+.idesc{font-size:9px;color:var(--t3);margin-top:1px}
+.isr{display:flex;flex-direction:column;align-items:flex-end}
+.isn{font-size:26px;font-weight:900;line-height:1}
+.isn.bull{color:var(--g)} .isn.neut{color:var(--y)} .isn.bear{color:var(--r)}
+.iwt{font-size:9px;background:var(--bg3);color:var(--t3);padding:1px 5px;border-radius:3px;margin-top:3px}
+.ival{font-size:14px;font-weight:700;margin-bottom:1px}
+.ichg{font-size:11px;font-weight:600;margin-bottom:7px}
+.ichg.up{color:var(--g)} .ichg.dn{color:var(--r)} .ichg.fl{color:var(--t2)}
+.isp{height:36px;margin-bottom:7px}
+.isubs{border-top:1px solid var(--border);padding-top:7px;display:flex;flex-direction:column;gap:3px}
+.irow{display:flex;justify-content:space-between;font-size:10px}
+.irn{color:var(--t2)} .irv{font-weight:600}
+.irc{font-size:9px} .irc.up{color:var(--g)} .irc.dn{color:var(--r)} .irc.fl{color:var(--t3)}
+.live-tag{font-size:8px;background:rgba(34,197,94,.2);color:var(--g);padding:1px 4px;border-radius:2px;margin-left:4px}
+
+/* ── DETAIL CHARTS ── */
+.dgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}
+.chwrap{position:relative;height:200px}
+
+/* ── TABLE ── */
+.tblwrap{overflow-x:auto}
+.htbl{width:100%;border-collapse:collapse;font-size:10px}
+.htbl th{background:var(--bg3);padding:5px 7px;text-align:center;color:var(--t2);font-weight:600;border-bottom:1px solid var(--border);white-space:nowrap;font-size:9px}
+.htbl td{padding:4px 7px;text-align:center;border-bottom:1px solid var(--bg3)}
+.htbl tr:hover td{background:rgba(255,255,255,.02)}
+.htbl tr.cur td{background:rgba(59,130,246,.07);font-weight:700}
+.htbl .mc{text-align:left;color:var(--t2);font-weight:600}
+.sc{border-radius:2px;padding:1px 3px;font-weight:600}
+.s90{background:rgba(34,197,94,.4);color:#4ade80}
+.s80{background:rgba(34,197,94,.22);color:#86efac}
+.s70{background:rgba(34,197,94,.1);color:#bbf7d0}
+.s65{background:rgba(34,197,94,.06);color:#dcfce7}
+.s55{color:var(--t2)}
+.s45{background:rgba(239,68,68,.08);color:#fca5a5}
+.s35{background:rgba(239,68,68,.18);color:#f87171}
+.s20{background:rgba(239,68,68,.35);color:#ef4444}
+
+/* ── STOCK TICKER ROW ── */
+.ticker-row{display:flex;gap:8px;margin-bottom:16px;overflow-x:auto;padding-bottom:2px}
+.ticker{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:8px 12px;white-space:nowrap;min-width:110px}
+.ticker-sym{font-size:9px;font-weight:700;color:var(--t3);text-transform:uppercase;margin-bottom:2px}
+.ticker-price{font-size:15px;font-weight:700}
+.ticker-chg{font-size:10px;font-weight:600}
+.ticker-chg.up{color:var(--g)} .ticker-chg.dn{color:var(--r)}
+
+/* ── RESPONSIVE ── */
+@media(max-width:1100px){.dash{grid-template-columns:200px 1fr}.dash>:nth-child(3){grid-column:1/-1}.igrid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:700px){.dash{grid-template-columns:1fr}.igrid{grid-template-columns:1fr 1fr}.dgrid{grid-template-columns:1fr}}
+@media(max-width:480px){.igrid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<!-- LOADING -->
+<div id="loadOverlay">
+  <div class="spin"></div>
+  <div id="loadTxt">시장 데이터 로딩 중...</div>
+  <div id="loadSub">Yahoo Finance API 연결</div>
+</div>
+
+<!-- HEADER -->
+<div class="hdr">
+  <div class="hdr-title">🔬 반도체 투자 지표 분석 <span>LIVE</span></div>
+  <div class="hdr-sep"></div>
+  <span class="badge" id="dataBadge">⟳ 로딩중</span>
+  <span id="updateTime" style="font-size:10px;color:var(--t3)"></span>
+  <div class="trng">
+    <button data-r="13" onclick="setRange(13)">3M</button>
+    <button data-r="26" onclick="setRange(26)">6M</button>
+    <button data-r="52" class="act" onclick="setRange(52)">1Y</button>
+    <button data-r="104" onclick="setRange(104)">2Y</button>
+  </div>
+  <button class="btn-refresh" id="refreshBtn" onclick="doRefresh()">
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+      <polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+    </svg> 새로고침
+  </button>
+  <div class="badge badge-sig" id="mainSig">— 분석중</div>
+</div>
+
+<main id="mainContent" style="opacity:0">
+
+<!-- TICKER ROW -->
+<div class="ticker-row" id="tickerRow"></div>
+
+<!-- SCORE DASHBOARD -->
+<div class="slbl">종합 점수 현황</div>
+<div class="dash">
+
+  <div class="card gauge-card">
+    <div class="gauge-wrap">
+      <svg viewBox="0 0 160 95">
+        <defs>
+          <linearGradient id="grd" x1="0%" x2="100%">
+            <stop offset="0%" stop-color="#ef4444" stop-opacity=".5"/>
+            <stop offset="50%" stop-color="#f59e0b" stop-opacity=".5"/>
+            <stop offset="100%" stop-color="#22c55e" stop-opacity=".5"/>
+          </linearGradient>
+        </defs>
+        <path d="M16 82 A64 64 0 0 1 144 82" fill="none" stroke="#1c2232" stroke-width="13" stroke-linecap="round"/>
+        <path d="M16 82 A64 64 0 0 1 144 82" fill="none" stroke="url(#grd)" stroke-width="13" stroke-linecap="round" opacity=".6"/>
+        <path id="gArc" d="M16 82 A64 64 0 0 1 144 82" fill="none" stroke="#3b82f6" stroke-width="13"
+              stroke-linecap="round" stroke-dasharray="201" stroke-dashoffset="201"/>
+        <text x="8" y="93" fill="#3d4f68" font-size="8">0</text>
+        <text x="76" y="14" fill="#3d4f68" font-size="8">50</text>
+        <text x="140" y="93" fill="#3d4f68" font-size="8">100</text>
+      </svg>
+      <div class="gauge-num"><div class="n" id="gNum" style="color:var(--b)">—</div><div class="d">/100</div></div>
+    </div>
+    <div class="gauge-meta">
+      <div class="gauge-chg" id="gChg">—</div>
+      <div class="gauge-hint" id="gHint">분석 대기중</div>
+    </div>
+    <div class="score-zones">
+      <div class="zone"><div class="zdot" style="background:var(--g)"></div>강세 ≥70</div>
+      <div class="zone"><div class="zdot" style="background:var(--y)"></div>중립 50~</div>
+      <div class="zone"><div class="zdot" style="background:var(--r)"></div>약세 &lt;50</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div style="font-size:12px;font-weight:600;margin-bottom:2px">종합 점수 추이</div>
+    <div style="font-size:10px;color:var(--t2);margin-bottom:10px">월별 가중 합산 (0~100) | 강세선 70 · 약세선 50</div>
+    <div class="chwrap"><canvas id="trendChart"></canvas></div>
+  </div>
+
+  <div class="card">
+    <div style="font-size:12px;font-weight:600;margin-bottom:12px">카테고리별 점수 (비중순)</div>
+    <div class="cbars" id="catBars"></div>
+  </div>
+</div>
+
+<!-- INDICATOR GRID -->
+<div class="slbl">핵심 지표 (비중 높은 순)</div>
+<div class="igrid" id="indGrid"></div>
+
+<!-- DETAIL CHARTS -->
+<div class="slbl">세부 분석 차트</div>
+<div class="dgrid">
+  <div class="card">
+    <div style="font-size:12px;font-weight:600;margin-bottom:2px">주요 반도체주 주가 추이 <span class="live-tag">LIVE</span></div>
+    <div style="font-size:10px;color:var(--t2);margin-bottom:10px">선택 기간 시작점 = 100 기준 정규화 | MU · NVDA · ^SOX · AMAT</div>
+    <div class="chwrap"><canvas id="stockChart"></canvas></div>
+  </div>
+  <div class="card">
+    <div style="font-size:12px;font-weight:600;margin-bottom:2px">DRAM 가격 추이</div>
+    <div style="font-size:10px;color:var(--t2);margin-bottom:10px">DDR5-6400 현물가 · DDR4-3200 계약가 ($/GB)</div>
+    <div class="chwrap"><canvas id="dramChart"></canvas></div>
+  </div>
+  <div class="card">
+    <div style="font-size:12px;font-weight:600;margin-bottom:2px">점수 구성 추이 (누적)</div>
+    <div style="font-size:10px;color:var(--t2);margin-bottom:10px">카테고리별 가중 기여점수 → 합산 = 종합 점수</div>
+    <div class="chwrap"><canvas id="compChart"></canvas></div>
+  </div>
+  <div class="card">
+    <div style="font-size:12px;font-weight:600;margin-bottom:2px">주요사 영업이익률 <span class="live-tag">LIVE 기반</span></div>
+    <div style="font-size:10px;color:var(--t2);margin-bottom:10px">삼성 DS · SK하이닉스 · 마이크론 OPM (%)</div>
+    <div class="chwrap"><canvas id="earnChart"></canvas></div>
+  </div>
+</div>
+
+<!-- SCORE TABLE -->
+<div class="slbl">월별 점수 이력 (최근 18개월 히트맵)</div>
+<div class="card tblwrap">
+  <table class="htbl" id="scoreTable"></table>
+</div>
+
+</main>
+<script>
+// ══════════════════════════════════════════════════════════
+// 정적 기준 데이터 (Jan 2024 ~ Jun 2026 = 30개월)
+// ══════════════════════════════════════════════════════════
+const MO30 = [
+  '24.01','24.02','24.03','24.04','24.05','24.06',
+  '24.07','24.08','24.09','24.10','24.11','24.12',
+  '25.01','25.02','25.03','25.04','25.05','25.06',
+  '25.07','25.08','25.09','25.10','25.11','25.12',
+  '26.01','26.02','26.03','26.04','26.05','26.06'
+];
+
+const CATS = [
+  { id:'dram',   name:'DRAM 가격 지수',    desc:'현물·계약가 모멘텀',        wt:20, live:'MU',
+    sval:'DDR5 $2.85/GB', schg:'+3.2% MoM',  sdir:'up', ssig:'neut',
+    scores:[42,48,55,62,67,72,75,73,68,62,58,55,52,48,44,40,38,42,48,52,57,61,63,62,63,64,66,64,63,65],
+    subs:[{n:'DDR5-6400 현물가',v:'$2.85/GB',c:'+3.2%',d:'up'},{n:'DDR4-3200 계약가',v:'$1.42/GB',c:'+1.8%',d:'up'},{n:'NAND TLC 128Gb',v:'$4.20/128Gb',c:'-0.5%',d:'dn'},{n:'3개월 가격 모멘텀',v:'+8.5%',c:'',d:'fl'}],
+  },
+  { id:'supply', name:'공급/수요 균형',    desc:'재고 주수·가동률·Bit 성장', wt:18, live:'MU',
+    sval:'재고 6.8주', schg:'-0.2주 개선',   sdir:'up', ssig:'neut',
+    scores:[45,50,55,60,65,68,70,68,65,60,56,52,50,47,44,41,40,43,47,51,55,58,60,61,62,63,62,61,60,62],
+    subs:[{n:'DRAM 재고 주수',v:'6.8주',c:'정상(6~8주)',d:'fl'},{n:'주요 팹 가동률',v:'82%',c:'+1%pt',d:'up'},{n:'Bit 수요 성장(YoY)',v:'+18%',c:'↑',d:'up'},{n:'Bit 공급 성장(YoY)',v:'+15%',c:'수요>공급',d:'up'}],
+  },
+  { id:'earn',   name:'주요사 실적',       desc:'영업이익률·매출 성장',       wt:15, live:'MU',
+    sval:'DS 28% OPM',    schg:'+3%pt QoQ',  sdir:'up', ssig:'bull',
+    scores:[40,45,52,58,65,70,75,77,75,70,65,62,58,55,52,48,45,48,53,58,63,66,68,70,71,72,73,71,70,71],
+    subs:[{n:'삼성 DS OPM',v:'28%',c:'+3%pt',d:'up'},{n:'SK하이닉스 OPM',v:'35%',c:'+2%pt',d:'up'},{n:'마이크론 매출(YoY)',v:'+22%',c:'↑',d:'up'},{n:'가이던스 서프라이즈',v:'+8%',c:'↑',d:'up'}],
+  },
+  { id:'demand', name:'PC/서버 수요',      desc:'출하량·하이퍼스케일러 Capex',wt:12, live:'NVDA',
+    sval:'서버 +12.8%',   schg:'+1.5%pt QoQ',sdir:'up', ssig:'bull',
+    scores:[55,57,60,63,65,68,70,72,71,69,68,67,66,65,63,62,60,62,65,67,69,71,72,73,74,75,74,73,72,74],
+    subs:[{n:'PC 출하량(YoY)',v:'+5.2%',c:'↑',d:'up'},{n:'서버 출하량(YoY)',v:'+12.8%',c:'↑↑',d:'up'},{n:'하이퍼스케일러 Capex',v:'+28%',c:'↑↑',d:'up'},{n:'스마트폰 DRAM(YoY)',v:'+6.5%',c:'↑',d:'up'}],
+  },
+  { id:'macro',  name:'거시경제',           desc:'PMI·Fed 금리·DXY',          wt:10, live:'^SOX',
+    sval:'PMI 51.8',      schg:'+0.3pt MoM', sdir:'up', ssig:'neut',
+    scores:[50,52,55,58,60,62,63,63,61,58,55,52,50,48,47,45,44,46,49,52,55,57,58,60,62,63,64,63,62,63],
+    subs:[{n:'글로벌 제조업 PMI',v:'51.8',c:'+0.3',d:'up'},{n:'Fed 기준금리',v:'3.75%',c:'↓인하 기조',d:'up'},{n:'DXY 달러 인덱스',v:'98.5',c:'-2.1%',d:'up'},{n:'소비자 신뢰지수',v:'105.2',c:'+2.1',d:'up'}],
+  },
+  { id:'equip',  name:'반도체 장비 수주',   desc:'SEMI 빌링·AMAT·LRCX 수주', wt:8,  live:'AMAT',
+    sval:'SEMI +15.2%',   schg:'+2.1%pt',    sdir:'up', ssig:'neut',
+    scores:[40,44,48,53,57,60,63,65,64,62,59,56,53,50,47,44,42,44,47,51,54,57,59,60,61,62,62,61,60,61],
+    subs:[{n:'SEMI 장비 빌링(YoY)',v:'+15.2%',c:'↑',d:'up'},{n:'AMAT 수주잔고',v:'$28.5B',c:'+8%',d:'up'},{n:'LRCX 수주잔고',v:'$22.1B',c:'+6%',d:'up'},{n:'장비 납기',v:'16주',c:'↓개선',d:'up'}],
+  },
+  { id:'tech',   name:'기술적 분석',        desc:'SOX 지수·RSI·MACD',         wt:8,  live:'^SOX',
+    sval:'SOX +8.5% vs MA',schg:'+1.2%pt',  sdir:'up', ssig:'neut',
+    scores:[45,50,56,62,67,70,72,71,68,63,58,54,52,49,46,43,41,44,48,53,57,61,63,64,65,66,65,63,62,64],
+    subs:[{n:'SOX vs 200MA',v:'+8.5%',c:'위',d:'up'},{n:'RSI(14)',v:'58',c:'적정',d:'fl'},{n:'MACD',v:'양전환',c:'Bullish',d:'up'},{n:'기관 순매수(3M)',v:'+$2.4B',c:'↑',d:'up'}],
+  },
+  { id:'hbm',    name:'HBM/AI 수요',        desc:'AI 서버·HBM·NVIDIA GB200',  wt:6,  live:'NVDA',
+    sval:'AI Capex +45%',  schg:'+3%pt QoQ', sdir:'up', ssig:'bull',
+    scores:[60,65,70,74,77,80,82,84,85,84,83,82,80,79,77,76,75,77,79,81,82,83,84,85,86,87,86,85,84,85],
+    subs:[{n:'AI 서버 Capex(YoY)',v:'+45%',c:'↑↑',d:'up'},{n:'HBM3E 수급',v:'공급 부족',c:'Tight',d:'up'},{n:'NVIDIA GB200 수요',v:'매우 강함',c:'↑',d:'up'},{n:'HBM 마진 프리미엄',v:'+180%',c:'↑',d:'up'}],
+  },
+  { id:'fx',     name:'환율 (FX)',           desc:'USD/KRW·달러 강약',         wt:3,  live:null,
+    sval:'USD/KRW 1,312',  schg:'-2.1% vs 3M',sdir:'up', ssig:'neut',
+    scores:[55,52,50,53,56,58,57,55,53,51,52,54,55,57,58,60,61,62,61,60,62,63,64,63,64,65,64,63,62,63],
+    subs:[{n:'USD/KRW',v:'1,312',c:'-2.1%',d:'up'},{n:'USD/JPY',v:'148.5',c:'-0.8%',d:'up'},{n:'DXY 달러 인덱스',v:'98.5',c:'약세',d:'up'},{n:'원화 강세 영향',v:'중립',c:'',d:'fl'}],
+  },
+];
+
+// 참조 시계열 (30M)
+const DDR5=[2.50,2.60,2.75,2.90,3.05,3.15,3.20,3.18,3.10,3.00,2.90,2.85,2.80,2.72,2.65,2.58,2.52,2.55,2.60,2.65,2.70,2.75,2.78,2.80,2.82,2.83,2.84,2.83,2.84,2.85];
+const DDR4=[1.10,1.15,1.20,1.25,1.30,1.35,1.38,1.37,1.35,1.32,1.28,1.25,1.22,1.18,1.15,1.12,1.10,1.12,1.15,1.18,1.20,1.23,1.35,1.38,1.40,1.41,1.42,1.41,1.41,1.42];
+const SAM=[- 5,2,8,15,22,28,32,34,32,28,25,22,20,18,15,12,10,12,15,18,21,24,26,27,28,29,30,28,27,28];
+const HYN=[5,10,16,22,28,34,38,40,38,35,32,29,27,25,22,19,17,19,22,26,29,32,34,35,36,37,38,36,35,35];
+const MIC=[-2,4,10,16,22,27,31,33,31,28,25,22,19,17,14,12,10,12,15,18,21,24,26,27,28,29,29,28,27,28];
+
+// 종합 점수 계산
+const OVERALL30 = MO30.map((_,i)=>Math.round(CATS.reduce((s,c)=>s+c.scores[i]*c.wt/100,0)));
+
+// ══════════════════════════════════════════════════════════
+// 상태
+// ══════════════════════════════════════════════════════════
+let RANGE = 52; // 주 단위 (52 = 1년)
+let LIVE = {};  // { symbol: parsedData }
+let SCORES = [...CATS.map(c=>({...c}))]; // live-updated copy
+let CHARTS = {};
+let IS_LIVE = false;
+
+// ══════════════════════════════════════════════════════════
+// 유틸
+// ══════════════════════════════════════════════════════════
+const clamp = (v,a,b)=>Math.min(b,Math.max(a,v));
+const pct   = (v,digits=1)=>(v>=0?'+':'')+v.toFixed(digits)+'%';
+const scoreColor = s=>s>=70?'#22c55e':s>=50?'#f59e0b':'#ef4444';
+const scoreSig   = s=>s>=70?'bull':s>=50?'neut':'bear';
+const scoreCls   = s=>s>=90?'s90':s>=80?'s80':s>=70?'s70':s>=65?'s65':s>=55?'s55':s>=45?'s45':s>=35?'s35':'s20';
+
+const AXIS = { ticks:{color:'#3d4f68',font:{size:9},maxRotation:0}, grid:{color:'rgba(37,47,66,.8)'} };
+const TTIP = { backgroundColor:'#1c2232',borderColor:'#252f42',borderWidth:1,titleColor:'#e2e8f0',bodyColor:'#7b8fa8',padding:8 };
+const LEG  = { labels:{color:'#7b8fa8',font:{size:10},boxWidth:10,padding:8}, position:'bottom' };
+
+// ══════════════════════════════════════════════════════════
+// YAHOO FINANCE FETCH
+// ══════════════════════════════════════════════════════════
+const SYMS = ['MU','NVDA','AMAT','LRCX','^SOX','^GSPC'];
+const SYM_META = {
+  'MU':    {name:'Micron (MU)',     color:'#60a5fa'},
+  'NVDA':  {name:'NVIDIA (NVDA)',   color:'#4ade80'},
+  'AMAT':  {name:'Appl. Materials', color:'#a78bfa'},
+  'LRCX':  {name:'Lam Research',   color:'#fb923c'},
+  '^SOX':  {name:'SOX Index',       color:'#fbbf24'},
+  '^GSPC': {name:'S&P 500',         color:'#94a3b8'},
+};
+
+async function fetchSym(sym) {
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?interval=1wk&range=2y&includePrePost=false&corsDomain=finance.yahoo.com`;
+  const proxies = [
+    url,
+    `https://corsproxy.io/?${encodeURIComponent(url)}`,
+    `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+  ];
+  for (const p of proxies) {
+    try {
+      const r = await fetch(p, { signal: AbortSignal.timeout(6000) });
+      if (!r.ok) continue;
+      const j = await r.json();
+      const parsed = parseYahoo(j, sym);
+      if (parsed) return parsed;
+    } catch {}
+  }
+  return null;
+}
+
+function parseYahoo(json, sym) {
+  const res = json?.chart?.result?.[0];
+  if (!res) return null;
+  const closes = res.indicators?.quote?.[0]?.close;
+  const times  = res.timestamp;
+  if (!closes || !times) return null;
+
+  // Valid weekly points
+  const pts = [];
+  times.forEach((t,i)=>{ if(closes[i]!=null) pts.push({t,p:closes[i]}); });
+  if (pts.length < 13) return null;
+
+  const n   = pts.length;
+  const cur = pts[n-1].p;
+  const get = w => pts[Math.max(0,n-w)].p;
+
+  const mom4w  = (cur-get(4))/get(4)*100;
+  const mom13w = (cur-get(13))/get(13)*100;
+  const mom26w = (cur-get(26))/get(26)*100;
+  const mom52w = n>=52 ? (cur-get(52))/get(52)*100 : null;
+
+  const ma13 = pts.slice(-13).reduce((s,x)=>s+x.p,0)/13;
+  const ma52 = pts.slice(-Math.min(52,n)).reduce((s,x)=>s+x.p,0)/Math.min(52,n);
+  const vsMA13 = (cur-ma13)/ma13*100;
+  const vsMA52 = (cur-ma52)/ma52*100;
+
+  // RSI(14 weekly)
+  const rsiPts = pts.slice(-16).map(x=>x.p);
+  let g=0,l=0;
+  for(let i=1;i<Math.min(15,rsiPts.length);i++){
+    const d=rsiPts[i]-rsiPts[i-1];
+    d>0?g+=d:l-=d;
+  }
+  const rsi = l===0?100:Math.round(100-100/(1+g/l));
+
+  // Normalized price series for chart
+  const series = pts.map(x=>({t:x.t,p:x.p}));
+
+  return { sym, cur, mom4w, mom13w, mom26w, mom52w, ma13, ma52, vsMA13, vsMA52, rsi, series };
+}
+
+// ══════════════════════════════════════════════════════════
+// LIVE SCORE CALCULATION
+// ══════════════════════════════════════════════════════════
+function liveScore(catId) {
+  const D = LIVE;
+  const mu=D.MU, nvda=D.NVDA, amat=D.AMAT, lrcx=D.LRCX, sox=D['^SOX'], spy=D['^GSPC'];
+
+  const sc = ({vsMA52,mom13w,mom4w,rsi})=>{
+    let s=50;
+    s+=clamp(vsMA52*1.1,-22,22);
+    s+=clamp(mom13w*.65,-18,18);
+    s+=clamp((mom4w||0)*.4,-8,8);
+    s+=rsi>70?-5:rsi>60?8:rsi>40?3:-8;
+    return Math.round(clamp(s,5,97));
+  };
+
+  switch(catId){
+    case 'dram':   return mu  ? sc({vsMA52:mu.vsMA52,  mom13w:mu.mom13w,  mom4w:mu.mom4w,  rsi:mu.rsi})  : null;
+    case 'supply': return mu && sox ? sc({
+      vsMA52: mu.vsMA52 - sox.vsMA52*0.4,
+      mom13w: mu.mom13w - sox.mom13w*0.35,
+      mom4w: mu.mom4w,
+      rsi: mu.rsi
+    }) : null;
+    case 'earn':   return mu  ? sc({vsMA52:mu.vsMA52*.9, mom13w:mu.mom13w*.9, mom4w:mu.mom4w, rsi:mu.rsi}) : null;
+    case 'demand': return nvda ? sc({vsMA52:nvda.vsMA52, mom13w:nvda.mom13w, mom4w:nvda.mom4w, rsi:nvda.rsi}) : null;
+    case 'macro':  return sox && spy ? sc({
+      vsMA52: sox.vsMA52*.55+(spy.vsMA52>0?4:-4),
+      mom13w: sox.mom13w*.6,
+      mom4w: sox.mom4w*.5,
+      rsi: sox.rsi
+    }) : null;
+    case 'equip':  {
+      if(!amat) return null;
+      const vs=(amat.vsMA52+(lrcx?lrcx.vsMA52:amat.vsMA52))/2;
+      const m=(amat.mom13w+(lrcx?lrcx.mom13w:amat.mom13w))/2;
+      return sc({vsMA52:vs, mom13w:m, mom4w:amat.mom4w, rsi:amat.rsi});
+    }
+    case 'tech':   return sox ? sc({vsMA52:sox.vsMA52, mom13w:sox.mom13w, mom4w:sox.mom4w, rsi:sox.rsi}) : null;
+    case 'hbm':    return nvda ? sc({vsMA52:nvda.vsMA52*1.1, mom13w:nvda.mom13w*1.05, mom4w:nvda.mom4w, rsi:nvda.rsi}) : null;
+    case 'fx':     return null; // fallback to static
+    default:       return null;
+  }
+}
+
+// ══════════════════════════════════════════════════════════
+// FETCH ALL & UPDATE
+// ══════════════════════════════════════════════════════════
+async function fetchAll() {
+  setLoading(true);
+  const results = await Promise.allSettled(SYMS.map(s=>fetchSym(s)));
+  let anyLive = false;
+  results.forEach((r,i)=>{
+    if(r.status==='fulfilled' && r.value){
+      LIVE[SYMS[i]] = r.value;
+      anyLive = true;
+    }
+  });
+  IS_LIVE = anyLive;
+
+  // Update scores
+  SCORES = CATS.map(c=>{
+    const ls = liveScore(c.id);
+    const finalScore = ls!==null ? ls : c.scores[29];
+    const scores = [...c.scores.slice(0,29), finalScore];
+    return { ...c, scores, currentScore: finalScore, isLive: ls!==null };
+  });
+
+  updateUI();
+  setLoading(false);
+}
+
+// ══════════════════════════════════════════════════════════
+// UI UPDATES
+// ══════════════════════════════════════════════════════════
+function setLoading(on) {
+  if(on){
+    document.getElementById('refreshBtn').classList.add('loading');
+  } else {
+    document.getElementById('loadOverlay').style.display='none';
+    document.getElementById('mainContent').style.opacity='1';
+    document.getElementById('refreshBtn').classList.remove('loading');
+  }
+}
+
+function updateUI() {
+  const overall = Math.round(SCORES.reduce((s,c)=>s+c.scores[29]*c.wt/100,0));
+  const prevOverall = Math.round(SCORES.reduce((s,c)=>s+c.scores[28]*c.wt/100,0));
+
+  // Gauge
+  const arc = document.getElementById('gArc');
+  const clr = scoreColor(overall);
+  arc.style.stroke = clr;
+  arc.setAttribute('stroke-dashoffset', 201*(1-overall/100));
+  document.getElementById('gNum').textContent = overall;
+  document.getElementById('gNum').style.color = clr;
+  const diff = overall - prevOverall;
+  document.getElementById('gChg').textContent = (diff>=0?'▲ +':'▼ ')+diff+'pt MoM';
+  document.getElementById('gChg').className = 'gauge-chg '+(diff>=0?'up':'dn');
+  document.getElementById('gHint').textContent = IS_LIVE ? '실시간 주가 반영' : '기준 데이터 26Q2';
+
+  // Signal badge
+  const sig = document.getElementById('mainSig');
+  const label = overall>=70?'강세 🟢 매수':overall>=60?'중립-강세 🟡':overall>=45?'중립 🟡':'약세 🔴 매도';
+  const cls   = overall>=70?'sig-bull':overall>=55?'sig-bull':overall>=45?'sig-neut':'sig-bear';
+  sig.className = 'badge badge-sig '+cls;
+  sig.textContent = label;
+
+  // Data badge
+  const db = document.getElementById('dataBadge');
+  if(IS_LIVE){
+    const t = new Date();
+    document.getElementById('updateTime').textContent = `${t.getHours().toString().padStart(2,'0')}:${t.getMinutes().toString().padStart(2,'0')} 업데이트`;
+    db.className='badge badge-live'; db.textContent='🟢 실시간';
+  } else {
+    document.getElementById('updateTime').textContent = '26.06.28 기준 데이터';
+    db.className='badge badge-cache'; db.textContent='🟡 캐시 데이터';
+  }
+
+  renderTickerRow();
+  renderCatBars();
+  renderIndCards();
+  renderAllCharts();
+  renderTable();
+}
+
+// ══════════════════════════════════════════════════════════
+// TICKER ROW
+// ══════════════════════════════════════════════════════════
+function renderTickerRow() {
+  const row = document.getElementById('tickerRow');
+  const tickers = IS_LIVE
+    ? SYMS.filter(s=>LIVE[s]).map(s=>{
+        const d=LIVE[s];
+        const chg=d.mom4w;
+        return `<div class="ticker">
+          <div class="ticker-sym">${SYM_META[s]?.name||s}</div>
+          <div class="ticker-price">${d.cur<100?d.cur.toFixed(2):d.cur.toFixed(1)}</div>
+          <div class="ticker-chg ${chg>=0?'up':'dn'}">${pct(chg)} (4주)</div>
+        </div>`;
+      })
+    : ['MU','NVDA','AMAT','^SOX'].map(s=>`<div class="ticker">
+        <div class="ticker-sym">${SYM_META[s]?.name||s}</div>
+        <div class="ticker-price" style="color:var(--t3)">—</div>
+        <div class="ticker-chg fl" style="color:var(--t3)">시장 데이터 없음</div>
+      </div>`);
+  row.innerHTML = tickers.join('');
+}
+
+// ══════════════════════════════════════════════════════════
+// CAT BARS
+// ══════════════════════════════════════════════════════════
+function renderCatBars() {
+  document.getElementById('catBars').innerHTML = SCORES.map(c=>{
+    const s=c.scores[29], clr=scoreColor(s);
+    return `<div class="crow">
+      <div class="cname" title="${c.name}">${c.name}</div>
+      <div class="btrack"><div class="bfill" style="width:${s}%;background:${clr}"></div></div>
+      <div class="cscore" style="color:${clr}">${s}${c.isLive?'<span class="live-tag">L</span>':''}</div>
+      <div class="cwt">${c.wt}%</div>
+    </div>`;
+  }).join('');
+}
+
+// ══════════════════════════════════════════════════════════
+// INDICATOR CARDS
+// ══════════════════════════════════════════════════════════
+function renderIndCards() {
+  document.getElementById('indGrid').innerHTML = SCORES.map(c=>{
+    const s   = c.scores[29];
+    const sig = scoreSig(s), clr = scoreColor(s);
+    const d   = LIVE[c.live];
+    const val  = (d&&c.isLive) ? `${c.live} $${d.cur<100?d.cur.toFixed(2):Math.round(d.cur)}` : c.sval;
+    const chg  = (d&&c.isLive) ? pct(d.mom13w)+' (3M)' : c.schg;
+    const dir  = (d&&c.isLive) ? (d.mom13w>=0?'up':'dn') : c.sdir;
+    const subs = c.subs.map(sub=>`<div class="irow">
+      <span class="irn">${sub.n}</span>
+      <span><span class="irv">${sub.v}</span>${sub.c?` <span class="irc ${sub.d}">${sub.c}</span>`:''}</span>
+    </div>`).join('');
+    const arrow = dir==='up'?'▲':dir==='dn'?'▼':'—';
+    return `<div class="icard ${sig}">
+      <div class="ihd">
+        <div><div class="ititle">${c.name}${c.isLive?`<span class="live-tag">LIVE</span>`:''}</div><div class="idesc">${c.desc}</div></div>
+        <div class="isr"><div class="isn ${sig}" style="color:${clr}">${s}</div><div class="iwt">비중 ${c.wt}%</div></div>
+      </div>
+      <div class="ival">${val}</div>
+      <div class="ichg ${dir}">${arrow} ${chg}</div>
+      <div class="isp"><canvas id="sp_${c.id}"></canvas></div>
+      <div class="isubs">${subs}</div>
+    </div>`;
+  }).join('');
+  // render sparklines after DOM update
+  requestAnimationFrame(renderSparks);
+}
+
+function renderSparks() {
+  (CHARTS._sparks||[]).forEach(c=>c.destroy());
+  CHARTS._sparks = [];
+  SCORES.forEach(c=>{
+    const cv = document.getElementById(`sp_${c.id}`);
+    if(!cv) return;
+    const s   = c.scores[29];
+    const clr = scoreColor(s);
+    const bgA = s>=70?'rgba(34,197,94,.1)':s>=50?'rgba(245,158,11,.1)':'rgba(239,68,68,.1)';
+    const n   = RANGE<=30?RANGE:30;
+    CHARTS._sparks.push(new Chart(cv,{
+      type:'line',
+      data:{labels:MO30.slice(-n),datasets:[{data:c.scores.slice(-n),borderColor:clr,borderWidth:1.5,backgroundColor:bgA,fill:true,pointRadius:0,tension:.35}]},
+      options:{responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{display:false},tooltip:{enabled:false}},
+        scales:{x:{display:false},y:{display:false,min:0,max:100}},animation:false}
+    }));
+  });
+}
+
+// ══════════════════════════════════════════════════════════
+// MAIN CHARTS
+// ══════════════════════════════════════════════════════════
+function sliceM(arr){ return arr.slice(Math.max(0,arr.length-Math.min(RANGE/4,30))); }
+function sliceMO(){ return MO30.slice(Math.max(0,30-Math.min(RANGE/4,30))); }
+
+function renderTrendChart() {
+  if(CHARTS.trend) CHARTS.trend.destroy();
+  const ctx = document.getElementById('trendChart').getContext('2d');
+  const grd = ctx.createLinearGradient(0,0,0,190);
+  grd.addColorStop(0,'rgba(59,130,246,.25)'); grd.addColorStop(1,'rgba(59,130,246,0)');
+  const mo = sliceMO();
+  const ov = sliceM(OVERALL30.map((_,i)=>Math.round(SCORES.reduce((s,c)=>s+c.scores[i]*c.wt/100,0))));
+  CHARTS.trend = new Chart(ctx,{
+    type:'line',
+    data:{labels:mo,datasets:[
+      {label:'종합 점수',data:ov,borderColor:'#3b82f6',borderWidth:2,backgroundColor:grd,fill:true,pointRadius:2.5,pointBackgroundColor:'#3b82f6',tension:.35},
+      {label:'강세선 70',data:mo.map(()=>70),borderColor:'rgba(34,197,94,.5)',borderWidth:1,borderDash:[5,4],pointRadius:0,fill:false},
+      {label:'약세선 50',data:mo.map(()=>50),borderColor:'rgba(239,68,68,.5)',borderWidth:1,borderDash:[5,4],pointRadius:0,fill:false},
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:LEG,tooltip:TTIP},
+      scales:{x:AXIS,y:{...AXIS,min:0,max:100}}}
+  });
+}
+
+function renderStockChart() {
+  if(CHARTS.stock) CHARTS.stock.destroy();
+  const cv = document.getElementById('stockChart');
+
+  if(!IS_LIVE || !Object.keys(LIVE).length){
+    // Fallback: show normalized static proxy (MU → DRAM score as proxy)
+    const mo = sliceMO();
+    const ctx = cv.getContext('2d');
+    CHARTS.stock = new Chart(ctx,{
+      type:'line',
+      data:{labels:mo,datasets:SCORES.slice(0,4).map((c,i)=>{
+        const clrs=['#60a5fa','#4ade80','#fbbf24','#a78bfa'];
+        const d = sliceM(c.scores);
+        const base = d[0]||50;
+        return {label:c.name,data:d.map(v=>(v/base*100-100).toFixed(1)),borderColor:clrs[i],borderWidth:1.5,fill:false,pointRadius:1,tension:.35};
+      })},
+      options:{responsive:true,maintainAspectRatio:false,
+        plugins:{legend:LEG,tooltip:{...TTIP,callbacks:{label:ctx=>`${ctx.dataset.label}: ${ctx.parsed.y}%`}}},
+        scales:{x:AXIS,y:{...AXIS,title:{display:true,text:'점수 기준 변화율 %',color:'#3d4f68',font:{size:9}}}}}
+    });
+    return;
+  }
+
+  // Live stock chart
+  const symsToShow = ['MU','NVDA','^SOX','AMAT'].filter(s=>LIVE[s]);
+  const CLRS = {MU:'#60a5fa',NVDA:'#4ade80','^SOX':'#fbbf24',AMAT:'#a78bfa'};
+
+  // Get aligned series for selected range
+  const now = Date.now()/1000;
+  const rangeSecs = RANGE * 7 * 86400;
+  const start = now - rangeSecs;
+
+  const datasets = symsToShow.map(sym=>{
+    const pts = LIVE[sym].series.filter(p=>p.t>=start);
+    if(!pts.length) return null;
+    const base = pts[0].p;
+    // Weekly → every point
+    const labels = pts.map(p=>{
+      const d=new Date(p.t*1000);
+      return `${d.getFullYear().toString().slice(2)}.${(d.getMonth()+1).toString().padStart(2,'0')}`;
+    });
+    return {
+      sym, labels,
+      data: pts.map(p=>+((p.p/base*100-100).toFixed(2))),
+      borderColor: CLRS[sym]||'#94a3b8',
+    };
+  }).filter(Boolean);
+
+  if(!datasets.length) return;
+
+  // Use longest label set
+  const labels = datasets.reduce((a,d)=>d.labels.length>a.length?d.labels:a, []);
+
+  CHARTS.stock = new Chart(document.getElementById('stockChart').getContext('2d'),{
+    type:'line',
+    data:{labels,datasets:datasets.map(d=>({
+      label:SYM_META[d.sym]?.name||d.sym,
+      data:d.data,
+      borderColor:d.borderColor,
+      borderWidth:2,fill:false,pointRadius:0,tension:.3
+    }))},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{
+        legend:LEG,
+        tooltip:{...TTIP,
+          mode:'index',intersect:false,
+          callbacks:{label:c=>`${c.dataset.label}: ${c.parsed.y>=0?'+':''}${c.parsed.y}%`}
+        }
+      },
+      scales:{
+        x:{...AXIS,ticks:{...AXIS.ticks,maxTicksLimit:8}},
+        y:{...AXIS,title:{display:true,text:'시작점 대비 수익률 %',color:'#3d4f68',font:{size:9}},
+          ticks:{...AXIS.ticks,callback:v=>(v>=0?'+':'')+v+'%'}}
+      }
+    }
+  });
+}
+
+function renderDramChart() {
+  if(CHARTS.dram) CHARTS.dram.destroy();
+  const mo = sliceMO();
+  CHARTS.dram = new Chart(document.getElementById('dramChart').getContext('2d'),{
+    type:'line',
+    data:{labels:mo,datasets:[
+      {label:'DDR5-6400 현물가 ($/GB)',data:sliceM(DDR5),borderColor:'#60a5fa',borderWidth:2,fill:false,pointRadius:1.5,tension:.35},
+      {label:'DDR4-3200 계약가 ($/GB)',data:sliceM(DDR4),borderColor:'#a78bfa',borderWidth:2,fill:false,pointRadius:1.5,tension:.35,borderDash:[4,3]},
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:LEG,tooltip:TTIP},
+      scales:{x:AXIS,y:{...AXIS,title:{display:true,text:'$/GB',color:'#3d4f68',font:{size:9}}}}}
+  });
+}
+
+function renderCompChart() {
+  if(CHARTS.comp) CHARTS.comp.destroy();
+  const mo  = sliceMO();
+  const PAL = ['#3b82f6','#06b6d4','#22c55e','#a855f7','#f59e0b','#ef4444','#fb923c','#ec4899','#64748b'];
+  CHARTS.comp = new Chart(document.getElementById('compChart').getContext('2d'),{
+    type:'bar',
+    data:{labels:mo,datasets:SCORES.map((c,i)=>({
+      label:c.name,
+      data:sliceM(c.scores).map(s=>+(s*c.wt/100).toFixed(1)),
+      backgroundColor:PAL[i]+'95',borderColor:PAL[i],borderWidth:0,stack:'s'
+    }))},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{
+        legend:{labels:{color:'#3d4f68',font:{size:8},boxWidth:8,padding:5},position:'bottom'},
+        tooltip:TTIP,
+      },
+      scales:{
+        x:{...AXIS,stacked:true},
+        y:{...AXIS,stacked:true,max:100,title:{display:true,text:'종합 점수',color:'#3d4f68',font:{size:9}}}
+      }
+    }
+  });
+}
+
+function renderEarnChart() {
+  if(CHARTS.earn) CHARTS.earn.destroy();
+  const mo = sliceMO();
+  CHARTS.earn = new Chart(document.getElementById('earnChart').getContext('2d'),{
+    type:'line',
+    data:{labels:mo,datasets:[
+      {label:'삼성 DS OPM (%)',  data:sliceM(SAM),borderColor:'#60a5fa',borderWidth:2,fill:false,pointRadius:1.5,tension:.35},
+      {label:'SK하이닉스 OPM (%)',data:sliceM(HYN),borderColor:'#4ade80',borderWidth:2,fill:false,pointRadius:1.5,tension:.35},
+      {label:'마이크론 OPM (%)', data:sliceM(MIC),borderColor:'#a78bfa',borderWidth:2,fill:false,pointRadius:1.5,tension:.35,borderDash:[4,3]},
+      {label:'BEP (0%)',          data:mo.map(()=>0),borderColor:'rgba(239,68,68,.3)',borderWidth:1,borderDash:[3,3],pointRadius:0,fill:false},
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:LEG,tooltip:TTIP},
+      scales:{x:AXIS,y:{...AXIS,title:{display:true,text:'OPM %',color:'#3d4f68',font:{size:9}}}}}
+  });
+}
+
+function renderAllCharts() {
+  renderTrendChart();
+  renderStockChart();
+  renderDramChart();
+  renderCompChart();
+  renderEarnChart();
+}
+
+// ══════════════════════════════════════════════════════════
+// SCORE HISTORY TABLE
+// ══════════════════════════════════════════════════════════
+function renderTable() {
+  const N = 18, off = 30-N;
+  const mo = MO30.slice(-N);
+  const ov = mo.map((_,ri)=>Math.round(SCORES.reduce((s,c)=>s+c.scores[off+ri]*c.wt/100,0)));
+  let html = `<thead><tr>
+    <th class="mc">월</th><th>종합</th><th>신호</th>
+    ${SCORES.map(c=>`<th title="${c.name}" style="min-width:30px">${c.wt}%<br><span style="font-weight:400;color:var(--t3)">${c.name.slice(0,4)}</span></th>`).join('')}
+  </tr></thead><tbody>`;
+  mo.forEach((m,ri)=>{
+    const gi=off+ri, ov_=ov[ri];
+    const sig=ov_>=70?'🟢강세':ov_>=60?'🟡중립↑':ov_>=45?'🟡중립':'🔴약세';
+    html+=`<tr${ri===N-1?' class="cur"':''}>
+      <td class="mc">${m}${ri===N-1?' ◀':''}</td>
+      <td class="sc ${scoreCls(ov_)}">${ov_}</td>
+      <td style="font-size:9px;white-space:nowrap">${sig}</td>
+      ${SCORES.map(c=>`<td class="sc ${scoreCls(c.scores[gi])}">${c.scores[gi]}</td>`).join('')}
+    </tr>`;
+  });
+  document.getElementById('scoreTable').innerHTML = html+'</tbody>';
+}
+
+// ══════════════════════════════════════════════════════════
+// TIME RANGE & REFRESH
+// ══════════════════════════════════════════════════════════
+function setRange(r) {
+  RANGE = r;
+  document.querySelectorAll('.trng button').forEach(b=>b.classList.toggle('act',+b.dataset.r===r));
+  if(CHARTS._sparks){CHARTS._sparks.forEach(c=>c.destroy());CHARTS._sparks=[];}
+  renderSparks();
+  renderAllCharts();
+}
+
+async function doRefresh() {
+  LIVE = {};
+  IS_LIVE = false;
+  document.getElementById('dataBadge').className='badge badge-cache';
+  document.getElementById('dataBadge').textContent='⟳ 업데이트 중...';
+  await fetchAll();
+}
+
+// ══════════════════════════════════════════════════════════
+// BOOT
+// ══════════════════════════════════════════════════════════
+(async()=>{
+  // Show static data immediately (0ms), then fetch
+  SCORES = CATS.map(c=>({...c,currentScore:c.scores[29],isLive:false}));
+  const overall = Math.round(CATS.reduce((s,c)=>s+c.scores[29]*c.wt/100,0));
+  document.getElementById('gArc').setAttribute('stroke-dashoffset', 201*(1-overall/100));
+  document.getElementById('gNum').textContent=overall;
+  document.getElementById('gNum').style.color=scoreColor(overall);
+  document.getElementById('loadSub').textContent='주가 데이터 연결 중 (Yahoo Finance)...';
+  await fetchAll();
+})();
+</script>
+</body>
+</html>
