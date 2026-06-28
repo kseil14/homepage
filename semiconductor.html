@@ -133,6 +133,30 @@ main{padding:14px 18px;max-width:1680px;margin:0 auto;transition:opacity .4s}
 .ticker-chg{font-size:10px;font-weight:600}
 .ticker-chg.up{color:var(--g)} .ticker-chg.dn{color:var(--r)}
 
+/* ── SIGNAL BANNER ── */
+.sig-banner{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:14px 18px;margin-bottom:14px;display:flex;align-items:center;gap:18px;flex-wrap:wrap}
+.sl-col{flex-shrink:0}
+.sl-lbl{font-size:9px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:7px}
+.sl-bar{display:flex;gap:4px}
+.sl-seg{padding:7px 14px;border-radius:6px;font-size:11px;font-weight:600;background:var(--bg3);color:var(--t3);border:1px solid var(--border);white-space:nowrap;transition:.2s}
+.sl-seg.act.l1{background:rgba(239,68,68,.28);color:#ef4444;border-color:rgba(239,68,68,.55);box-shadow:0 0 14px rgba(239,68,68,.18)}
+.sl-seg.act.l2{background:rgba(239,68,68,.13);color:#f87171;border-color:rgba(239,68,68,.3)}
+.sl-seg.act.l3{background:rgba(245,158,11,.15);color:#fbbf24;border-color:rgba(245,158,11,.38)}
+.sl-seg.act.l4{background:rgba(34,197,94,.13);color:#4ade80;border-color:rgba(34,197,94,.3)}
+.sl-seg.act.l5{background:rgba(34,197,94,.28);color:#22c55e;border-color:rgba(34,197,94,.55);box-shadow:0 0 14px rgba(34,197,94,.18)}
+.sl-div{width:1px;background:var(--border);align-self:stretch;flex-shrink:0}
+.sl-detail{flex:1;min-width:180px}
+.sl-main{font-size:18px;font-weight:800;margin-bottom:4px;display:flex;align-items:baseline;gap:8px}
+.sl-main small{font-size:11px;color:var(--t2);font-weight:400}
+.sl-items{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
+.sl-item{font-size:10px;padding:2px 8px;border-radius:4px;white-space:nowrap}
+.sl-item.pos{background:rgba(34,197,94,.1);color:#4ade80}
+.sl-item.neg{background:rgba(239,68,68,.1);color:#f87171}
+.sl-item.neu{background:var(--bg3);color:var(--t2)}
+.sl-rules{flex-shrink:0;border-left:1px solid var(--border);padding-left:16px;display:flex;flex-direction:column;gap:4px}
+.sl-rtitle{font-size:9px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px}
+.sl-rule{font-size:10px;color:var(--t3)}
+
 /* ── RESPONSIVE ── */
 @media(max-width:1100px){.dash{grid-template-columns:200px 1fr}.dash>:nth-child(3){grid-column:1/-1}.igrid{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:700px){.dash{grid-template-columns:1fr}.igrid{grid-template-columns:1fr 1fr}.dgrid{grid-template-columns:1fr}}
@@ -169,6 +193,36 @@ main{padding:14px 18px;max-width:1680px;margin:0 auto;transition:opacity .4s}
 </div>
 
 <main id="mainContent" style="opacity:0">
+
+<!-- SIGNAL BANNER -->
+<div class="sig-banner">
+  <div class="sl-col">
+    <div class="sl-lbl">매매 신호</div>
+    <div class="sl-bar">
+      <div class="sl-seg" id="sl1">강력매도</div>
+      <div class="sl-seg" id="sl2">매도</div>
+      <div class="sl-seg" id="sl3">유지</div>
+      <div class="sl-seg" id="sl4">매수</div>
+      <div class="sl-seg" id="sl5">강력매수</div>
+    </div>
+  </div>
+  <div class="sl-div"></div>
+  <div class="sl-detail">
+    <div class="sl-main">
+      <span id="slLabel">— 분석중</span>
+      <small id="slScore"></small>
+    </div>
+    <div class="sl-items" id="slItems"></div>
+  </div>
+  <div class="sl-div"></div>
+  <div class="sl-rules">
+    <div class="sl-rtitle">핵심 매매 기준</div>
+    <div class="sl-rule">📈 <b>매수</b>: DRAM 3대장 3M +7%↑ + SOX 52wMA 상회 + 점수 ≥62</div>
+    <div class="sl-rule">⏸ <b>유지</b>: DRAM 횡보 / SOX 중립 / 점수 48~61</div>
+    <div class="sl-rule">📉 <b>매도</b>: DRAM 3M -7%↓ 또는 SOX 52wMA -5%↓</div>
+    <div class="sl-rule">🔴 <b>강력매도</b>: DRAM -15%↓ 또는 SOX -12%↓ 급락</div>
+  </div>
+</div>
 
 <!-- TICKER ROW -->
 <div class="ticker-row" id="tickerRow"></div>
@@ -491,6 +545,133 @@ function liveScore(catId) {
 }
 
 // ══════════════════════════════════════════════════════════
+// 매매 신호 계산
+// ══════════════════════════════════════════════════════════
+function calcSignal() {
+  const overall = Math.round(SCORES.reduce((s,c)=>s+c.scores[29]*c.wt/100,0));
+  let adj = overall;
+  const pos = [], warn = [];
+
+  const mu  = LIVE.MU;
+  const hyx = LIVE['000660.KS'];
+  const sam = LIVE['005930.KS'];
+  const sox = LIVE['^SOX'];
+
+  // ── 1. DRAM 3대장 주가 모멘텀 ──────────────────────────
+  //    MU 50% · SK하이닉스 30% · 삼성전자 20% 가중
+  const dramStocks = [mu, hyx, sam].filter(Boolean);
+  if (dramStocks.length) {
+    const rawWts = [mu?0.5:0, hyx?0.3:0, sam?0.2:0];
+    const wtSum  = rawWts.reduce((a,b)=>a+b, 0);
+    const wts    = rawWts.map(w=>w/wtSum);
+    const all3   = [mu, hyx, sam];
+    const m13 = all3.reduce((s,x,i)=>s+(x?x.mom13w*wts[i]:0), 0); // 3개월(13주)
+    const m4  = all3.reduce((s,x,i)=>s+(x?x.mom4w*wts[i]:0),  0); // 4주 단기
+
+    if      (m13 >= 15) { adj+=12; pos.push(`DRAM 3대장 3M +${m13.toFixed(1)}% 강세`); }
+    else if (m13 >= 7)  { adj+=6;  pos.push(`DRAM 주가 3M +${m13.toFixed(1)}% 양호`); }
+    else if (m13 >= 0)  { adj+=2; }
+    else if (m13 >= -7) { adj-=7;  warn.push(`DRAM 주가 3M ${m13.toFixed(1)}% 하락`); }
+    else if (m13 >= -15){ adj-=14; warn.push(`DRAM 주가 3M ${m13.toFixed(1)}% 급락 → 매도`); }
+    else                { adj-=22; warn.push(`DRAM 주가 3M ${m13.toFixed(1)}% 폭락 → 강력매도`); }
+
+    if      (m4 < -6)  { adj-=5;  warn.push(`DRAM 단기(4주) ${m4.toFixed(1)}% 급락`); }
+    else if (m4 < -3)  { adj-=2;  warn.push(`DRAM 단기(4주) ${m4.toFixed(1)}% 약세`); }
+    else if (m4 > 6)   { adj+=3;  pos.push(`DRAM 단기 +${m4.toFixed(1)}% 반등`); }
+  } else {
+    // 정적 DRAM 점수 기반 대체
+    const dScore = SCORES.find(c=>c.id==='dram')?.scores[29]||50;
+    const dTrend = dScore - (SCORES.find(c=>c.id==='dram')?.scores[27]||dScore);
+    if      (dScore < 40) { adj-=8;  warn.push(`DRAM 가격 지수 약세 (${dScore}점)`); }
+    else if (dScore > 65) { adj+=5;  pos.push(`DRAM 가격 지수 강세 (${dScore}점)`); }
+    if (dTrend < -4)      { adj-=4;  warn.push(`DRAM 점수 하락 추세`); }
+    else if (dTrend > 4)  { adj+=3;  pos.push(`DRAM 점수 상승 추세`); }
+  }
+
+  // ── 2. SOX / 반도체 ETF 방향 ─────────────────────────
+  //    SOX 52주 이평 대비 위치 + 3개월 모멘텀
+  if (sox) {
+    if      (sox.vsMA52 <= -12) { adj-=15; warn.push(`SOX 52wMA -${Math.abs(sox.vsMA52).toFixed(1)}% 하회 → ETF 매도`); }
+    else if (sox.vsMA52 <= -5)  { adj-=7;  warn.push(`SOX 52wMA ${sox.vsMA52.toFixed(1)}% 하회`); }
+    else if (sox.vsMA52 >= 12)  { adj+=8;  pos.push(`SOX 52wMA +${sox.vsMA52.toFixed(1)}% 강세`); }
+    else if (sox.vsMA52 >= 5)   { adj+=4;  pos.push(`SOX 52wMA +${sox.vsMA52.toFixed(1)}% 상회`); }
+
+    if      (sox.mom13w <= -15) { adj-=8;  warn.push(`SOX ETF 3M -${Math.abs(sox.mom13w).toFixed(1)}% 급락`); }
+    else if (sox.mom13w <= -5)  { adj-=4; }
+    else if (sox.mom13w >= 15)  { adj+=5;  pos.push(`SOX ETF 3M +${sox.mom13w.toFixed(1)}%`); }
+  } else {
+    // 정적 SOX 대체: tech 카테고리 점수
+    const techScore = SCORES.find(c=>c.id==='tech')?.scores[29]||50;
+    if (techScore < 45) { adj-=6; warn.push(`기술적 지표 약세 (${techScore}점)`); }
+    else if (techScore > 65) { adj+=4; pos.push(`기술적 지표 강세 (${techScore}점)`); }
+  }
+
+  // ── 3. 점수 추세: 최근 3개월 vs 직전 3개월 ──────────
+  const cur3 = SCORES.reduce((s,c)=>s+c.scores.slice(-3).reduce((a,b)=>a+b,0)/3*c.wt/100, 0);
+  const prv3 = SCORES.reduce((s,c)=>s+c.scores.slice(-6,-3).reduce((a,b)=>a+b,0)/3*c.wt/100, 0);
+  const trend = cur3 - prv3;
+  if      (trend >=  5) { adj+=5; pos.push(`종합 점수 상승 추세 (+${trend.toFixed(1)}pt)`); }
+  else if (trend <= -5) { adj-=5; warn.push(`종합 점수 하락 추세 (${trend.toFixed(1)}pt)`); }
+
+  // ── 4. HBM/AI 수요 특별 보너스 ──────────────────────
+  const hbm  = SCORES.find(c=>c.id==='hbm')?.scores[29]||0;
+  if (hbm >= 82) { adj+=4; pos.push(`HBM/AI 수요 강세 (${hbm}점)`); }
+
+  // ── 5. 거시경제 보정 ─────────────────────────────────
+  const macro = SCORES.find(c=>c.id==='macro')?.scores[29]||50;
+  if      (macro >= 65) { adj+=3; pos.push(`거시경제 우호 (PMI↑, Fed↓)`); }
+  else if (macro <= 40) { adj-=5; warn.push(`거시경제 부정적`); }
+
+  // ── 6. 공급/수요 재고 과잉 경보 ─────────────────────
+  const supply = SCORES.find(c=>c.id==='supply')?.scores[29]||50;
+  if      (supply < 40) { adj-=6; warn.push(`반도체 재고 과잉 우려 (${supply}점)`); }
+  else if (supply > 68) { adj+=3; pos.push(`재고 타이트 · 수요 우위`); }
+
+  adj = Math.round(clamp(adj, 0, 100));
+
+  // ── 최종 신호 판정 ───────────────────────────────────
+  let level, label, cls;
+  if      (adj >= 75) { level=5; label='강력매수'; cls='l5'; }
+  else if (adj >= 62) { level=4; label='매수';     cls='l4'; }
+  else if (adj >= 48) { level=3; label='유지';     cls='l3'; }
+  else if (adj >= 35) { level=2; label='매도';     cls='l2'; }
+  else                { level=1; label='강력매도'; cls='l1'; }
+
+  return { level, label, cls, overall, adj, pos, warn };
+}
+
+function renderSignal() {
+  const s = calcSignal();
+
+  // 5단계 바
+  for (let i=1; i<=5; i++) {
+    const el = document.getElementById('sl'+i);
+    el.className = 'sl-seg' + (i===s.level ? ` act ${s.cls}` : '');
+  }
+
+  // 라벨 + 점수
+  const lclr = {l1:'#ef4444',l2:'#f87171',l3:'#fbbf24',l4:'#4ade80',l5:'#22c55e'}[s.cls];
+  document.getElementById('slLabel').textContent = s.label;
+  document.getElementById('slLabel').style.color = lclr;
+  document.getElementById('slScore').textContent =
+    `종합 ${s.overall}점 → 조정 ${s.adj}점`;
+
+  // 근거 아이템 (긍정 먼저, 경고 나중, 최대 6개)
+  const all = [
+    ...s.pos.map(t=>({t,c:'pos'})),
+    ...s.warn.map(t=>({t,c:'neg'})),
+  ].slice(0, 6);
+  document.getElementById('slItems').innerHTML = all.length
+    ? all.map(x=>`<span class="sl-item ${x.c}">${x.c==='pos'?'✅':'⚠️'} ${x.t}</span>`).join('')
+    : '<span class="sl-item neu">실시간 데이터 로딩 후 상세 근거 표시</span>';
+
+  // 헤더 뱃지 동기화
+  const hdrSig = document.getElementById('mainSig');
+  hdrSig.className = 'badge badge-sig ' + ({l5:'sig-bull',l4:'sig-bull',l3:'sig-neut',l2:'sig-bear',l1:'sig-bear'}[s.cls]);
+  hdrSig.textContent = s.label;
+}
+
+// ══════════════════════════════════════════════════════════
 // FETCH ALL & UPDATE
 // ══════════════════════════════════════════════════════════
 async function fetchAll() {
@@ -569,6 +750,7 @@ function updateUI() {
   renderIndCards();
   renderAllCharts();
   renderTable();
+  renderSignal();
 }
 
 // ══════════════════════════════════════════════════════════
