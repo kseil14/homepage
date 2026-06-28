@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>반도체 투자 지표 분석 시스템</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg:     #0b0e14;
+  --bg2:    #141820;
+  --bg3:    #1e2532;
+  --border: #2a3040;
+  --text:   #e4e8f0;
+  --text2:  #8892a4;
+  --text3:  #4e5a6e;
+  --green:  #4ade80;
+  --green2: #22c55e;
+  --red:    #f87171;
+  --red2:   #ef4444;
+  --yellow: #fbbf24;
+  --blue:   #60a5fa;
+  --blue2:  #3b82f6;
+  --purple: #a78bfa;
+  --cyan:   #22d3ee;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);font-size:13px;line-height:1.5;min-height:100vh}
+
+/* ── HEADER ── */
+.hdr{background:var(--bg2);border-bottom:1px solid var(--border);padding:10px 20px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;gap:12px;flex-wrap:wrap}
+.hdr h1{font-size:15px;font-weight:700;display:flex;align-items:center;gap:8px;white-space:nowrap}
+.hdr h1 em{font-style:normal;font-size:10px;background:var(--blue2);color:#fff;padding:2px 7px;border-radius:4px}
+.hdr-right{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.hdr-date{font-size:11px;color:var(--text3);white-space:nowrap}
+.sig-badge{display:flex;align-items:center;gap:5px;padding:4px 12px;border-radius:20px;font-weight:700;font-size:11px;white-space:nowrap}
+.sig-badge.bull{background:rgba(34,197,94,.15);color:var(--green2);border:1px solid rgba(34,197,94,.3)}
+.sig-badge.neut{background:rgba(251,191,36,.15);color:var(--yellow);border:1px solid rgba(251,191,36,.3)}
+.sig-badge.bear{background:rgba(239,68,68,.15);color:var(--red2);border:1px solid rgba(239,68,68,.3)}
+.trng{display:flex;gap:4px}
+.trng button{background:var(--bg3);border:1px solid var(--border);color:var(--text2);padding:3px 9px;border-radius:4px;cursor:pointer;font-size:11px;transition:all .15s}
+.trng button.act{background:var(--blue2);border-color:var(--blue2);color:#fff}
+.trng button:hover:not(.act){border-color:var(--text2);color:var(--text)}
+
+/* ── LAYOUT ── */
+main{padding:16px 20px;max-width:1640px;margin:0 auto}
+.sec-lbl{font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin:0 0 12px;display:flex;align-items:center;gap:8px}
+.sec-lbl::after{content:'';flex:1;height:1px;background:var(--border)}
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:16px}
+.card-title{font-size:12px;font-weight:600;margin-bottom:2px}
+.card-sub{font-size:10px;color:var(--text2);margin-bottom:12px}
+
+/* ── SCORE DASHBOARD ── */
+.dash-grid{display:grid;grid-template-columns:230px 1fr 290px;gap:14px;margin-bottom:20px}
+.gauge-card{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px 16px}
+.gauge-wrap{position:relative;width:170px;height:100px}
+.gauge-wrap svg{width:100%;height:100%}
+.gauge-num{position:absolute;bottom:2px;left:50%;transform:translateX(-50%);text-align:center}
+.gauge-num .n{font-size:38px;font-weight:800;line-height:1}
+.gauge-num .d{font-size:10px;color:var(--text3)}
+.gauge-meta{margin-top:10px;text-align:center}
+.gauge-chg{font-size:12px;font-weight:700}
+.gauge-chg.up{color:var(--green2)} .gauge-chg.down{color:var(--red2)}
+.gauge-hint{font-size:10px;color:var(--text3);margin-top:2px}
+.legend-row{display:flex;gap:10px;margin-top:10px;justify-content:center}
+.legend-dot{display:flex;align-items:center;gap:4px;font-size:9px;color:var(--text2)}
+.legend-dot i{width:7px;height:7px;border-radius:50%;display:inline-block}
+
+/* ── CATEGORY BARS ── */
+.cat-list{display:flex;flex-direction:column;gap:7px}
+.cat-row{display:grid;grid-template-columns:130px 1fr 34px 28px;align-items:center;gap:8px}
+.cat-name{font-size:10px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bar-track{height:6px;background:var(--bg3);border-radius:3px;overflow:hidden}
+.bar-fill{height:100%;border-radius:3px;transition:width .5s ease}
+.cat-score{font-size:11px;font-weight:700;text-align:right}
+.cat-wt{font-size:9px;color:var(--text3);text-align:right}
+
+/* ── INDICATOR CARDS ── */
+.ind-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px}
+.ind-card{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:14px;position:relative;overflow:hidden}
+.ind-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px}
+.ind-card.bull::before{background:var(--green2)}
+.ind-card.neut::before{background:var(--yellow)}
+.ind-card.bear::before{background:var(--red2)}
+.ind-hd{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px}
+.ind-title{font-size:12px;font-weight:600}
+.ind-desc{font-size:10px;color:var(--text3);margin-top:1px}
+.ind-sr{display:flex;flex-direction:column;align-items:flex-end}
+.ind-snum{font-size:24px;font-weight:800;line-height:1}
+.ind-snum.bull{color:var(--green2)} .ind-snum.neut{color:var(--yellow)} .ind-snum.bear{color:var(--red2)}
+.ind-wt{font-size:9px;background:var(--bg3);color:var(--text3);padding:1px 6px;border-radius:3px;margin-top:3px}
+.ind-val{font-size:15px;font-weight:700;margin-bottom:2px}
+.ind-chg{font-size:11px;font-weight:600;margin-bottom:8px;display:flex;align-items:center;gap:3px}
+.ind-chg.up{color:var(--green)} .ind-chg.down{color:var(--red)} .ind-chg.flat{color:var(--text2)}
+.spark-wrap{height:38px;margin-bottom:8px}
+.subs{border-top:1px solid var(--border);padding-top:7px;display:flex;flex-direction:column;gap:4px}
+.sub-row{display:flex;justify-content:space-between;align-items:center;font-size:10px}
+.sub-name{color:var(--text2)}
+.sub-val{font-weight:600}
+.sub-chg{font-size:9px}
+.sub-chg.up{color:var(--green)} .sub-chg.down{color:var(--red)} .sub-chg.flat{color:var(--text3)}
+
+/* ── DETAIL CHARTS ── */
+.detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px}
+.ch-wrap{position:relative;height:210px}
+
+/* ── SCORE TABLE ── */
+.tbl-wrap{overflow-x:auto}
+.stbl{width:100%;border-collapse:collapse;font-size:10px}
+.stbl th{background:var(--bg3);padding:6px 7px;text-align:center;color:var(--text2);font-weight:600;border-bottom:1px solid var(--border);white-space:nowrap}
+.stbl td{padding:4px 7px;text-align:center;border-bottom:1px solid var(--bg3)}
+.stbl tr:last-child td{border-bottom:none}
+.stbl tr:hover td{background:var(--bg3)}
+.stbl .mcol{text-align:left;color:var(--text2);font-weight:500}
+.stbl .now-row td{background:rgba(59,130,246,.08);font-weight:600}
+.sc{border-radius:3px;padding:1px 2px}
+.s90{background:rgba(34,197,94,.4);color:#4ade80}
+.s80{background:rgba(34,197,94,.25);color:#86efac}
+.s70{background:rgba(34,197,94,.12);color:#bbf7d0}
+.s60{background:rgba(251,191,36,.12);color:#fde68a}
+.s50{color:var(--text2)}
+.s40{background:rgba(239,68,68,.1);color:#fca5a5}
+.s30{background:rgba(239,68,68,.22);color:#f87171}
+.s20{background:rgba(239,68,68,.38);color:#ef4444}
+
+/* ── RESPONSIVE ── */
+@media(max-width:1100px){
+  .dash-grid{grid-template-columns:200px 1fr;grid-template-rows:auto auto}
+  .dash-grid>:nth-child(3){grid-column:1/-1}
+  .ind-grid{grid-template-columns:repeat(2,1fr)}
+}
+@media(max-width:700px){
+  .dash-grid{grid-template-columns:1fr}
+  .ind-grid{grid-template-columns:1fr 1fr}
+  .detail-grid{grid-template-columns:1fr}
+}
+@media(max-width:480px){.ind-grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <h1>🔬 반도체 투자 지표 분석 <em>BETA</em></h1>
+  <div class="hdr-right">
+    <div class="trng">
+      <button data-r="3"  onclick="setRange(3)">3M</button>
+      <button data-r="6"  onclick="setRange(6)">6M</button>
+      <button data-r="12" onclick="setRange(12)" class="act">1Y</button>
+      <button data-r="24" onclick="setRange(24)">2Y</button>
+      <button data-r="30" onclick="setRange(30)">MAX</button>
+    </div>
+    <span class="hdr-date" id="hdrDate">2026.06.28 기준</span>
+    <div class="sig-badge" id="mainSig">● 중립-강세</div>
+  </div>
+</div>
+
+<main>
+
+<!-- ════ SCORE DASHBOARD ════ -->
+<div class="sec-lbl">종합 점수 현황</div>
+<div class="dash-grid">
+
+  <!-- 게이지 -->
+  <div class="card gauge-card">
+    <div class="gauge-wrap">
+      <svg viewBox="0 0 170 100" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="trackGrd" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stop-color="#ef4444" stop-opacity=".4"/>
+            <stop offset="50%" stop-color="#fbbf24" stop-opacity=".4"/>
+            <stop offset="100%" stop-color="#22c55e" stop-opacity=".4"/>
+          </linearGradient>
+        </defs>
+        <!-- 배경 트랙 -->
+        <path d="M 18 84 A 67 67 0 0 1 152 84" fill="none" stroke="#1e2532" stroke-width="13" stroke-linecap="round"/>
+        <!-- 그라데이션 배경 -->
+        <path d="M 18 84 A 67 67 0 0 1 152 84" fill="none" stroke="url(#trackGrd)" stroke-width="13" stroke-linecap="round" opacity=".5"/>
+        <!-- 점수 아크 -->
+        <path id="gaugeArc" d="M 18 84 A 67 67 0 0 1 152 84" fill="none" stroke="#3b82f6"
+              stroke-width="13" stroke-linecap="round" stroke-dasharray="211" stroke-dashoffset="70"/>
+        <!-- 눈금 마커 -->
+        <line x1="18" y1="84" x2="25" y2="84" stroke="#2a3040" stroke-width="2"/>
+        <line x1="85" y1="17" x2="85" y2="24" stroke="#2a3040" stroke-width="2"/>
+        <line x1="152" y1="84" x2="145" y2="84" stroke="#2a3040" stroke-width="2"/>
+        <text x="8" y="96" fill="#4e5a6e" font-size="8">0</text>
+        <text x="80" y="13" fill="#4e5a6e" font-size="8">50</text>
+        <text x="147" y="96" fill="#4e5a6e" font-size="8">100</text>
+      </svg>
+      <div class="gauge-num">
+        <div class="n" id="gaugeNum">67</div>
+        <div class="d">/ 100</div>
+      </div>
+    </div>
+    <div class="gauge-meta">
+      <div class="gauge-chg up" id="gaugeChg">▲ +2pt MoM</div>
+      <div class="gauge-hint">전월 65 → 현재 67</div>
+    </div>
+    <div class="legend-row">
+      <div class="legend-dot"><i style="background:var(--green2)"></i>강세 ≥70</div>
+      <div class="legend-dot"><i style="background:var(--yellow)"></i>중립 50~</div>
+      <div class="legend-dot"><i style="background:var(--red2)"></i>약세 &lt;50</div>
+    </div>
+  </div>
+
+  <!-- 점수 추이 차트 -->
+  <div class="card">
+    <div class="card-title">종합 점수 추이</div>
+    <div class="card-sub">월별 가중 합산 점수 (0~100) | 강세선 70 / 약세선 50</div>
+    <div class="ch-wrap"><canvas id="trendChart"></canvas></div>
+  </div>
+
+  <!-- 카테고리 바 -->
+  <div class="card">
+    <div class="card-title" style="margin-bottom:14px">카테고리별 점수 (비중 순)</div>
+    <div class="cat-list" id="catBars"></div>
+  </div>
+
+</div>
+
+<!-- ════ 핵심 지표 카드 ════ -->
+<div class="sec-lbl">핵심 지표 상세 (비중 높은 순)</div>
+<div class="ind-grid" id="indGrid"></div>
+
+<!-- ════ 세부 차트 ════ -->
+<div class="sec-lbl">세부 분석 차트</div>
+<div class="detail-grid">
+
+  <div class="card">
+    <div class="card-title">DRAM 가격 추이</div>
+    <div class="card-sub">DDR5-6400 8Gb 현물가 ($/GB) | DDR4-3200 8Gb 계약가 ($/GB)</div>
+    <div class="ch-wrap"><canvas id="dramChart"></canvas></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">공급/수요 지표</div>
+    <div class="card-sub">재고 주수 (막대, 좌축) | 팹 가동률 % (선, 우축)</div>
+    <div class="ch-wrap"><canvas id="supplyChart"></canvas></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">종합 점수 구성 추이 (누적)</div>
+    <div class="card-sub">카테고리별 가중 기여 점수 합산 → 종합 점수</div>
+    <div class="ch-wrap"><canvas id="compChart"></canvas></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">주요 반도체사 영업이익률</div>
+    <div class="card-sub">삼성 DS | SK하이닉스 | 마이크론 OPM (%)</div>
+    <div class="ch-wrap"><canvas id="earnChart"></canvas></div>
+  </div>
+
+</div>
+
+<!-- ════ 점수 이력 히트맵 ════ -->
+<div class="sec-lbl">월별 점수 이력 (히트맵, 최근 18개월)</div>
+<div class="card tbl-wrap">
+  <table class="stbl" id="scoreTable"></table>
+</div>
+
+</main>
+
+<script>
+// ══════════════════════════════════════════════
+// 데이터 (Jan 2024 ~ Jun 2026 = 30개월)
+// ══════════════════════════════════════════════
+const MO = [
+  '24.01','24.02','24.03','24.04','24.05','24.06',
+  '24.07','24.08','24.09','24.10','24.11','24.12',
+  '25.01','25.02','25.03','25.04','25.05','25.06',
+  '25.07','25.08','25.09','25.10','25.11','25.12',
+  '26.01','26.02','26.03','26.04','26.05','26.06'
+];
+
+// 9개 카테고리: 비중 합 = 100%
+const CATS = [
+  {
+    id:'dram', name:'DRAM 가격 지수', desc:'현물·계약가 모멘텀', wt:20,
+    val:'DDR5 $2.85/GB', chg:'+3.2% MoM', dir:'up', sig:'neut',
+    scores:[42,48,55,62,67,72,75,73,68,62,58,55,52,48,44,40,38,42,48,52,57,61,63,62,63,64,66,64,63,65],
+    subs:[
+      {n:'DDR5-6400 현물가',   v:'$2.85/GB',    c:'+3.2%',    d:'up'},
+      {n:'DDR4-3200 계약가',   v:'$1.42/GB',    c:'+1.8%',    d:'up'},
+      {n:'NAND TLC 128Gb',     v:'$4.20/128Gb', c:'-0.5%',    d:'down'},
+      {n:'3개월 가격 모멘텀',  v:'+8.5%',       c:'QoQ',      d:'up'},
+    ]
+  },
+  {
+    id:'supply', name:'공급/수요 균형', desc:'재고·가동률·Bit 성장', wt:18,
+    val:'재고 6.8주', chg:'-0.2주 MoM (↑개선)', dir:'up', sig:'neut',
+    scores:[45,50,55,60,65,68,70,68,65,60,56,52,50,47,44,41,40,43,47,51,55,58,60,61,62,63,62,61,60,62],
+    subs:[
+      {n:'DRAM 재고 주수',      v:'6.8주',  c:'(정상 6~8주)', d:'flat'},
+      {n:'주요 팹 가동률',      v:'82%',    c:'+1%pt',        d:'up'},
+      {n:'Bit 수요 성장(YoY)',  v:'+18%',   c:'↑',            d:'up'},
+      {n:'Bit 공급 성장(YoY)', v:'+15%',   c:'수요 > 공급',   d:'up'},
+    ]
+  },
+  {
+    id:'earn', name:'주요사 실적', desc:'영업이익률·매출 성장', wt:15,
+    val:'DS 28% OPM', chg:'+3%pt QoQ', dir:'up', sig:'bull',
+    scores:[40,45,52,58,65,70,75,77,75,70,65,62,58,55,52,48,45,48,53,58,63,66,68,70,71,72,73,71,70,71],
+    subs:[
+      {n:'삼성 DS 영업이익률',  v:'28%',  c:'+3%pt', d:'up'},
+      {n:'SK하이닉스 OPM',     v:'35%',  c:'+2%pt', d:'up'},
+      {n:'마이크론 매출(YoY)', v:'+22%', c:'↑',     d:'up'},
+      {n:'가이던스 서프라이즈', v:'+8%', c:'↑',     d:'up'},
+    ]
+  },
+  {
+    id:'demand', name:'PC/서버 수요', desc:'출하량·하이퍼스케일러 Capex', wt:12,
+    val:'서버 +12.8%', chg:'+1.5%pt QoQ', dir:'up', sig:'bull',
+    scores:[55,57,60,63,65,68,70,72,71,69,68,67,66,65,63,62,60,62,65,67,69,71,72,73,74,75,74,73,72,74],
+    subs:[
+      {n:'PC 출하량(YoY)',             v:'+5.2%', c:'↑',  d:'up'},
+      {n:'서버 출하량(YoY)',            v:'+12.8%',c:'↑↑', d:'up'},
+      {n:'하이퍼스케일러 Capex(YoY)',   v:'+28%',  c:'↑↑', d:'up'},
+      {n:'스마트폰 DRAM 수요(YoY)',    v:'+6.5%', c:'↑',  d:'up'},
+    ]
+  },
+  {
+    id:'macro', name:'거시경제', desc:'PMI·Fed·DXY', wt:10,
+    val:'PMI 51.8', chg:'+0.3pt MoM', dir:'up', sig:'neut',
+    scores:[50,52,55,58,60,62,63,63,61,58,55,52,50,48,47,45,44,46,49,52,55,57,58,60,62,63,64,63,62,63],
+    subs:[
+      {n:'글로벌 제조업 PMI', v:'51.8',  c:'+0.3',    d:'up'},
+      {n:'Fed 기준금리',      v:'3.75%', c:'↓ 인하 기조', d:'up'},
+      {n:'DXY 달러 인덱스',  v:'98.5',  c:'-2.1%',   d:'up'},
+      {n:'소비자 신뢰지수',  v:'105.2', c:'+2.1',    d:'up'},
+    ]
+  },
+  {
+    id:'equip', name:'반도체 장비 수주', desc:'SEMI 빌링·주요 장비사 수주잔고', wt:8,
+    val:'SEMI +15.2%', chg:'+2.1%pt MoM', dir:'up', sig:'neut',
+    scores:[40,44,48,53,57,60,63,65,64,62,59,56,53,50,47,44,42,44,47,51,54,57,59,60,61,62,62,61,60,61],
+    subs:[
+      {n:'SEMI 장비 빌링(YoY)', v:'+15.2%', c:'↑',    d:'up'},
+      {n:'AMAT 수주잔고',       v:'$28.5B', c:'+8%',  d:'up'},
+      {n:'LRCX 수주잔고',       v:'$22.1B', c:'+6%',  d:'up'},
+      {n:'장비 납기',           v:'16주',   c:'↓개선', d:'up'},
+    ]
+  },
+  {
+    id:'tech', name:'기술적 분석', desc:'SOX·RSI·MACD', wt:8,
+    val:'SOX +8.5% vs MA', chg:'+1.2%pt MoM', dir:'up', sig:'neut',
+    scores:[45,50,56,62,67,70,72,71,68,63,58,54,52,49,46,43,41,44,48,53,57,61,63,64,65,66,65,63,62,64],
+    subs:[
+      {n:'SOX vs 200MA',    v:'+8.5%',  c:'(위)',       d:'up'},
+      {n:'RSI(14)',          v:'58',     c:'적정 구간',  d:'flat'},
+      {n:'MACD 시그널',     v:'양전환', c:'Bullish',    d:'up'},
+      {n:'기관 순매수(3M)', v:'+$2.4B', c:'↑',         d:'up'},
+    ]
+  },
+  {
+    id:'hbm', name:'HBM/AI 수요', desc:'AI 서버·HBM·엔비디아 GB200', wt:6,
+    val:'AI Capex +45%', chg:'+3%pt QoQ', dir:'up', sig:'bull',
+    scores:[60,65,70,74,77,80,82,84,85,84,83,82,80,79,77,76,75,77,79,81,82,83,84,85,86,87,86,85,84,85],
+    subs:[
+      {n:'AI 서버 Capex(YoY)', v:'+45%',    c:'↑↑',     d:'up'},
+      {n:'HBM3E 수급 현황',    v:'공급 부족', c:'Tight',  d:'up'},
+      {n:'NVIDIA GB200 수요',  v:'매우 강함', c:'↑',     d:'up'},
+      {n:'HBM 마진 프리미엄',  v:'+180%',   c:'↑',      d:'up'},
+    ]
+  },
+  {
+    id:'fx', name:'환율 (FX)', desc:'USD/KRW·달러 강약', wt:3,
+    val:'USD/KRW 1,312', chg:'-2.1% vs 3M (원화↑)', dir:'up', sig:'neut',
+    scores:[55,52,50,53,56,58,57,55,53,51,52,54,55,57,58,60,61,62,61,60,62,63,64,63,64,65,64,63,62,63],
+    subs:[
+      {n:'USD/KRW',       v:'1,312', c:'-2.1%',   d:'up'},
+      {n:'USD/JPY',       v:'148.5', c:'-0.8%',   d:'up'},
+      {n:'DXY 달러 인덱스',v:'98.5', c:'약세',    d:'up'},
+      {n:'원화 강세 영향', v:'중립',  c:'',        d:'flat'},
+    ]
+  },
+];
+
+// 가격 데이터
+const DDR5 = [2.50,2.60,2.75,2.90,3.05,3.15,3.20,3.18,3.10,3.00,2.90,2.85,2.80,2.72,2.65,2.58,2.52,2.55,2.60,2.65,2.70,2.75,2.78,2.80,2.82,2.83,2.84,2.83,2.84,2.85];
+const DDR4 = [1.10,1.15,1.20,1.25,1.30,1.35,1.38,1.37,1.35,1.32,1.28,1.25,1.22,1.18,1.15,1.12,1.10,1.12,1.15,1.18,1.20,1.23,1.35,1.38,1.40,1.41,1.42,1.41,1.41,1.42];
+const INV  = [11,10,9,8,7.5,7,6.5,6.2,6.5,7,7.5,8,8.5,9,9.5,10,10.5,10,9.5,9,8.5,8,7.5,7.2,7,6.8,6.7,6.8,6.9,6.8];
+const UTIL = [65,68,72,76,79,81,83,84,83,81,79,77,75,73,71,70,70,71,73,75,77,79,80,81,82,83,82,82,81,82];
+const SAM  = [-5,2,8,15,22,28,32,34,32,28,25,22,20,18,15,12,10,12,15,18,21,24,26,27,28,29,30,28,27,28];
+const HYN  = [5,10,16,22,28,34,38,40,38,35,32,29,27,25,22,19,17,19,22,26,29,32,34,35,36,37,38,36,35,35];
+const MIC  = [-2,4,10,16,22,27,31,33,31,28,25,22,19,17,14,12,10,12,15,18,21,24,26,27,28,29,29,28,27,28];
+
+// 종합 점수 계산
+const OVERALL = MO.map((_,i) =>
+  Math.round(CATS.reduce((s,c) => s + c.scores[i]*c.wt/100, 0))
+);
+
+// ══════════════════════════════════════════════
+// 상태
+// ══════════════════════════════════════════════
+let RANGE = 12;
+const CHARTS = {};
+
+// ══════════════════════════════════════════════
+// 유틸
+// ══════════════════════════════════════════════
+const scoreColor = s => s>=70?'#22c55e':s>=50?'#fbbf24':'#ef4444';
+const scoreSig   = s => s>=70?'bull':s>=50?'neut':'bear';
+const scoreCls   = s => s>=90?'s90':s>=80?'s80':s>=70?'s70':s>=60?'s60':s>=50?'s50':s>=40?'s40':s>=30?'s30':'s20';
+const sliceArr   = a => a.slice(a.length-RANGE);
+const sliceMo    = () => MO.slice(MO.length-RANGE);
+
+const AXIS_DEFAULTS = {
+  ticks:{color:'#4e5a6e',font:{size:9},maxRotation:0},
+  grid:{color:'#1e2532'},
+};
+const TOOLTIP_DEFAULTS = {
+  backgroundColor:'#1e2532',borderColor:'#2a3040',borderWidth:1,
+  titleColor:'#e4e8f0',bodyColor:'#8892a4',
+};
+const LEGEND_DEFAULTS = {
+  labels:{color:'#8892a4',font:{size:10},boxWidth:10,padding:8},
+  position:'bottom',
+};
+
+// ══════════════════════════════════════════════
+// 게이지 업데이트
+// ══════════════════════════════════════════════
+function updateGauge(score) {
+  const total = 211;
+  const arc   = document.getElementById('gaugeArc');
+  const num   = document.getElementById('gaugeNum');
+  const clr   = scoreColor(score);
+  arc.style.stroke = clr;
+  arc.setAttribute('stroke-dashoffset', total*(1-score/100));
+  num.textContent   = score;
+  num.style.color   = clr;
+  const prev = OVERALL[OVERALL.length-2];
+  const chgEl = document.getElementById('gaugeChg');
+  const diff  = score - prev;
+  chgEl.textContent = (diff>=0?'▲ +':'▼ ')+diff+'pt MoM';
+  chgEl.className   = 'gauge-chg '+(diff>=0?'up':'down');
+  document.querySelector('.gauge-hint').textContent = `전월 ${prev} → 현재 ${score}`;
+
+  const sig  = document.getElementById('mainSig');
+  const smap = {bull:{t:'강세 (매수)',cls:'bull'},neut:{t:'중립-강세',cls:'neut'},bear:{t:'약세 (매도)',cls:'bear'}};
+  const s    = score>=70?'bull':score>=55?'bull':score>=45?'neut':'bear';
+  const label= score>=70?'강세 (매수)':score>=55?'중립-강세':score>=45?'중립':'약세 (매도)';
+  sig.className = 'sig-badge '+(score>=60?'bull':'neut');
+  sig.textContent = '● '+label;
+}
+
+// ══════════════════════════════════════════════
+// 카테고리 바
+// ══════════════════════════════════════════════
+function renderCatBars() {
+  document.getElementById('catBars').innerHTML = CATS.map(c => {
+    const clr = scoreColor(c.scores[29]);
+    return `<div class="cat-row">
+      <div class="cat-name" title="${c.name}">${c.name}</div>
+      <div class="bar-track"><div class="bar-fill" style="width:${c.scores[29]}%;background:${clr}"></div></div>
+      <div class="cat-score" style="color:${clr}">${c.scores[29]}</div>
+      <div class="cat-wt">${c.wt}%</div>
+    </div>`;
+  }).join('');
+}
+
+// ══════════════════════════════════════════════
+// 지표 카드
+// ══════════════════════════════════════════════
+function renderIndCards() {
+  document.getElementById('indGrid').innerHTML = CATS.map(c => {
+    const s   = c.scores[29];
+    const sig = scoreSig(s);
+    const clr = scoreColor(s);
+    const arrow = c.dir==='up'?'▲':c.dir==='down'?'▼':'—';
+    const subsHtml = c.subs.map(sub =>
+      `<div class="sub-row">
+        <span class="sub-name">${sub.n}</span>
+        <span>
+          <span class="sub-val">${sub.v}</span>
+          ${sub.c?`<span class="sub-chg ${sub.d}"> ${sub.c}</span>`:''}
+        </span>
+      </div>`
+    ).join('');
+    return `<div class="ind-card ${sig}">
+      <div class="ind-hd">
+        <div>
+          <div class="ind-title">${c.name}</div>
+          <div class="ind-desc">${c.desc}</div>
+        </div>
+        <div class="ind-sr">
+          <div class="ind-snum ${sig}" style="color:${clr}">${s}</div>
+          <div class="ind-wt">비중 ${c.wt}%</div>
+        </div>
+      </div>
+      <div class="ind-val">${c.val}</div>
+      <div class="ind-chg ${c.dir}">${arrow} ${c.chg}</div>
+      <div class="spark-wrap"><canvas id="sp_${c.id}"></canvas></div>
+      <div class="subs">${subsHtml}</div>
+    </div>`;
+  }).join('');
+}
+
+// ══════════════════════════════════════════════
+// 스파크라인
+// ══════════════════════════════════════════════
+function renderSparks() {
+  if (CHARTS._sparks) CHARTS._sparks.forEach(c=>c.destroy());
+  CHARTS._sparks = [];
+  CATS.forEach(c => {
+    const cv = document.getElementById(`sp_${c.id}`);
+    if (!cv) return;
+    const clr  = scoreColor(c.scores[29]);
+    const rgba = clr.replace('#','');
+    const bgA  = clr === '#22c55e' ? 'rgba(34,197,94,.12)' :
+                 clr === '#fbbf24' ? 'rgba(251,191,36,.12)' : 'rgba(239,68,68,.12)';
+    CHARTS._sparks.push(new Chart(cv, {
+      type:'line',
+      data:{
+        labels: sliceMo(),
+        datasets:[{data:sliceArr(c.scores),borderColor:clr,borderWidth:1.5,
+          backgroundColor:bgA,fill:true,pointRadius:0,tension:.35}]
+      },
+      options:{
+        responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{display:false},tooltip:{enabled:false}},
+        scales:{x:{display:false},y:{display:false,min:0,max:100}},
+        animation:false,
+      }
+    }));
+  });
+}
+
+// ══════════════════════════════════════════════
+// 메인 차트들
+// ══════════════════════════════════════════════
+function renderTrendChart() {
+  if(CHARTS.trend) CHARTS.trend.destroy();
+  const ctx = document.getElementById('trendChart').getContext('2d');
+  const grd = ctx.createLinearGradient(0,0,0,200);
+  grd.addColorStop(0,'rgba(59,130,246,.28)'); grd.addColorStop(1,'rgba(59,130,246,0)');
+  const mo = sliceMo();
+  CHARTS.trend = new Chart(ctx,{
+    type:'line',
+    data:{
+      labels:mo,
+      datasets:[
+        {label:'종합 점수',data:sliceArr(OVERALL),borderColor:'#3b82f6',borderWidth:2,
+         backgroundColor:grd,fill:true,pointRadius:2.5,pointBackgroundColor:'#3b82f6',tension:.35},
+        {label:'강세 기준 (70)',data:mo.map(()=>70),borderColor:'rgba(34,197,94,.45)',
+         borderWidth:1,borderDash:[5,4],pointRadius:0,fill:false},
+        {label:'약세 기준 (50)',data:mo.map(()=>50),borderColor:'rgba(239,68,68,.45)',
+         borderWidth:1,borderDash:[5,4],pointRadius:0,fill:false},
+      ]
+    },
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:LEGEND_DEFAULTS,tooltip:TOOLTIP_DEFAULTS},
+      scales:{
+        x:{...AXIS_DEFAULTS},
+        y:{...AXIS_DEFAULTS,min:0,max:100,ticks:{...AXIS_DEFAULTS.ticks,stepSize:10}},
+      }
+    }
+  });
+}
+
+function renderDramChart() {
+  if(CHARTS.dram) CHARTS.dram.destroy();
+  CHARTS.dram = new Chart(document.getElementById('dramChart').getContext('2d'),{
+    type:'line',
+    data:{
+      labels:sliceMo(),
+      datasets:[
+        {label:'DDR5-6400 현물 ($/GB)',data:sliceArr(DDR5),borderColor:'#60a5fa',
+         borderWidth:2,fill:false,pointRadius:2,tension:.35},
+        {label:'DDR4-3200 계약 ($/GB)',data:sliceArr(DDR4),borderColor:'#a78bfa',
+         borderWidth:2,fill:false,pointRadius:2,tension:.35,borderDash:[4,3]},
+      ]
+    },
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:LEGEND_DEFAULTS,tooltip:TOOLTIP_DEFAULTS},
+      scales:{x:{...AXIS_DEFAULTS},y:{...AXIS_DEFAULTS,title:{display:true,text:'$/GB',color:'#4e5a6e',font:{size:9}}}}
+    }
+  });
+}
+
+function renderSupplyChart() {
+  if(CHARTS.supply) CHARTS.supply.destroy();
+  CHARTS.supply = new Chart(document.getElementById('supplyChart').getContext('2d'),{
+    type:'bar',
+    data:{
+      labels:sliceMo(),
+      datasets:[
+        {type:'bar',label:'재고 주수 (주)',data:sliceArr(INV),
+         backgroundColor:'rgba(251,191,36,.45)',borderColor:'#fbbf24',borderWidth:1,yAxisID:'y'},
+        {type:'line',label:'팹 가동률 (%)',data:sliceArr(UTIL),
+         borderColor:'#4ade80',borderWidth:2,fill:false,pointRadius:1.5,tension:.35,yAxisID:'y2'},
+        // 정상 재고 기준선
+        {type:'line',label:'재고 정상 상한 (8주)',
+         data:sliceMo().map(()=>8),borderColor:'rgba(239,68,68,.4)',
+         borderWidth:1,borderDash:[4,3],pointRadius:0,fill:false,yAxisID:'y'},
+      ]
+    },
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:LEGEND_DEFAULTS,tooltip:TOOLTIP_DEFAULTS},
+      scales:{
+        x:{...AXIS_DEFAULTS},
+        y:{...AXIS_DEFAULTS,position:'left',max:14,
+           title:{display:true,text:'재고 주수',color:'#4e5a6e',font:{size:9}}},
+        y2:{...AXIS_DEFAULTS,position:'right',min:50,max:100,
+            grid:{display:false},
+            title:{display:true,text:'가동률 %',color:'#4e5a6e',font:{size:9}}},
+      }
+    }
+  });
+}
+
+function renderCompChart() {
+  if(CHARTS.comp) CHARTS.comp.destroy();
+  const PALETTE = ['#3b82f6','#22d3ee','#4ade80','#a78bfa','#fbbf24','#f87171','#fb923c','#e879f9','#94a3b8'];
+  CHARTS.comp = new Chart(document.getElementById('compChart').getContext('2d'),{
+    type:'bar',
+    data:{
+      labels:sliceMo(),
+      datasets: CATS.map((c,i)=>({
+        label:`${c.name}`,
+        data: sliceArr(c.scores).map(s=>+(s*c.wt/100).toFixed(1)),
+        backgroundColor: PALETTE[i]+'99',
+        borderColor: PALETTE[i],
+        borderWidth:0,
+        stack:'s',
+      }))
+    },
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{
+        legend:{labels:{color:'#4e5a6e',font:{size:8},boxWidth:8,padding:6},position:'bottom'},
+        tooltip:TOOLTIP_DEFAULTS,
+      },
+      scales:{
+        x:{...AXIS_DEFAULTS,stacked:true},
+        y:{...AXIS_DEFAULTS,stacked:true,max:100,
+           title:{display:true,text:'종합 점수',color:'#4e5a6e',font:{size:9}}},
+      }
+    }
+  });
+}
+
+function renderEarnChart() {
+  if(CHARTS.earn) CHARTS.earn.destroy();
+  CHARTS.earn = new Chart(document.getElementById('earnChart').getContext('2d'),{
+    type:'line',
+    data:{
+      labels:sliceMo(),
+      datasets:[
+        {label:'삼성 DS OPM (%)',  data:sliceArr(SAM),borderColor:'#60a5fa',borderWidth:2,fill:false,pointRadius:2,tension:.35},
+        {label:'SK하이닉스 OPM (%)',data:sliceArr(HYN),borderColor:'#4ade80',borderWidth:2,fill:false,pointRadius:2,tension:.35},
+        {label:'마이크론 OPM (%)',  data:sliceArr(MIC),borderColor:'#a78bfa',borderWidth:2,fill:false,pointRadius:2,tension:.35,borderDash:[4,3]},
+        {label:'BEP (0%)',          data:sliceMo().map(()=>0),borderColor:'rgba(239,68,68,.3)',
+         borderWidth:1,borderDash:[3,3],pointRadius:0,fill:false},
+      ]
+    },
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:LEGEND_DEFAULTS,tooltip:TOOLTIP_DEFAULTS},
+      scales:{x:{...AXIS_DEFAULTS},y:{...AXIS_DEFAULTS,title:{display:true,text:'OPM %',color:'#4e5a6e',font:{size:9}}}}
+    }
+  });
+}
+
+// ══════════════════════════════════════════════
+// 히트맵 테이블 (최근 18개월)
+// ══════════════════════════════════════════════
+function renderTable() {
+  const n   = 18;
+  const mo  = MO.slice(-n);
+  const ov  = OVERALL.slice(-n);
+  const off = MO.length - n;
+
+  const shortNames = CATS.map(c => c.name.slice(0,5));
+  let html = `<thead>
+    <tr>
+      <th class="mcol">월</th>
+      <th>종합</th>
+      <th>신호</th>
+      ${CATS.map(c=>`<th title="${c.name}">${c.wt}%<br><small style="font-weight:400;color:var(--text3)">${c.name.slice(0,4)}</small></th>`).join('')}
+    </tr>
+  </thead><tbody>`;
+
+  mo.forEach((m,ri)=>{
+    const gi  = off+ri;
+    const ov_ = ov[ri];
+    const isNow = ri===n-1;
+    html += `<tr${isNow?' class="now-row"':''}>
+      <td class="mcol">${m}${isNow?' ◀':''}</td>
+      <td class="sc ${scoreCls(ov_)}">${ov_}</td>
+      <td style="font-size:9px;white-space:nowrap">${ov_>=70?'🟢강세':ov_>=55?'🟡중립강':ov_>=45?'🟡중립':'🔴약세'}</td>
+      ${CATS.map(c=>`<td class="sc ${scoreCls(c.scores[gi])}">${c.scores[gi]}</td>`).join('')}
+    </tr>`;
+  });
+
+  html += '</tbody>';
+  document.getElementById('scoreTable').innerHTML = html;
+}
+
+// ══════════════════════════════════════════════
+// 시간 범위
+// ══════════════════════════════════════════════
+function setRange(n) {
+  RANGE = n;
+  document.querySelectorAll('.trng button').forEach(b=>{
+    b.classList.toggle('act', +b.dataset.r===n);
+  });
+  if(CHARTS._sparks) CHARTS._sparks.forEach(c=>c.destroy());
+  renderSparks();
+  renderTrendChart();
+  renderDramChart();
+  renderSupplyChart();
+  renderCompChart();
+  renderEarnChart();
+}
+
+// ══════════════════════════════════════════════
+// 초기화
+// ══════════════════════════════════════════════
+function init() {
+  const cur = OVERALL[OVERALL.length-1];
+  updateGauge(cur);
+  renderCatBars();
+  renderIndCards();
+  renderSparks();
+  renderTrendChart();
+  renderDramChart();
+  renderSupplyChart();
+  renderCompChart();
+  renderEarnChart();
+  renderTable();
+}
+
+document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>
